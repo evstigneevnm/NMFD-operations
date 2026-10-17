@@ -1,0 +1,48 @@
+name: Operations
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      run_cuda:
+        description: Run CUDA tests on a self-hosted cuda runner
+        type: boolean
+        default: false
+
+jobs:
+  cpu:
+    name: ${{ matrix.target }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [test-hierarchy, test-glued, test-algebra, test-io, test-multiprecision, check-headers]
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - run: sudo apt-get update && sudo apt-get install -y libboost-dev
+      - run: make -j2 ${{ matrix.target }}
+
+  sanitizers:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - run: make test-hierarchy test-glued EXTRA_FLAGS="-O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer"
+        env:
+          ASAN_OPTIONS: detect_leaks=1
+
+  cuda:
+    if: github.event_name == 'workflow_dispatch' && inputs.run_cuda
+    runs-on: [self-hosted, linux, cuda]
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - run: make -j2 test-cuda CONFIG_FILE=build_configs/config_cuda.inc

@@ -1,0 +1,4 @@
+[submodule "contrib/scfd"]
+	path = contrib/scfd
+	url = https://github.com/oryabkov/SCFD-all.git
+	branch = nevstigneev

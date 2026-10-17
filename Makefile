@@ -1,0 +1,96 @@
+CONFIG_FILE ?= build_configs/config_cpu.inc
+include $(CONFIG_FILE)
+
+BUILD_DIR ?= build
+SCFD_ROOT ?= contrib/scfd
+BOOST_ROOT ?=
+CUDA_ROOT ?= /usr/local/cuda
+NVCC ?= $(CUDA_ROOT)/bin/nvcc
+CUDA_ARCH ?= 75
+NVCCFLAGS ?= -std=c++17 -O2 --extended-lambda -gencode arch=compute_$(CUDA_ARCH),code=sm_$(CUDA_ARCH)
+OMP_NUM_THREADS ?= 4
+EXTRA_FLAGS ?=
+CPPFLAGS += -Iinclude -I$(SCFD_ROOT)/include
+ifneq ($(strip $(BOOST_ROOT)),)
+CPPFLAGS += -I$(BOOST_ROOT)/include
+endif
+HEADERS := $(shell find include test -name '*.h' -o -name '*.cuh')
+CPU_TESTS = $(BUILD_DIR)/hierarchy.bin $(BUILD_DIR)/glued.bin $(BUILD_DIR)/algebra_float.bin $(BUILD_DIR)/algebra_double.bin $(BUILD_DIR)/product.bin $(BUILD_DIR)/matrix_market.bin $(BUILD_DIR)/small_dense.bin $(BUILD_DIR)/io.bin
+CUDA_TESTS = $(BUILD_DIR)/hierarchy_cuda.bin $(BUILD_DIR)/glued_cuda.bin $(BUILD_DIR)/algebra_cuda_float.bin $(BUILD_DIR)/algebra_cuda_double.bin
+
+.PHONY: all test test-cpu test-hierarchy test-glued test-algebra test-io test-multiprecision test-cuda check-headers
+all: $(CPU_TESTS)
+test: test-cpu
+test-cpu: test-hierarchy test-glued test-algebra test-io
+
+$(BUILD_DIR):
+	mkdir -p $@
+
+$(BUILD_DIR)/hierarchy.bin: test/test_nmfd_vector_space_hierarchy.cpp $(HEADERS) | $(BUILD_DIR)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(EXTRA_FLAGS) $(OPENMP_FLAGS) $< -o $@
+
+$(BUILD_DIR)/glued.bin: test/test_glued_operations.cpp $(HEADERS) | $(BUILD_DIR)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(EXTRA_FLAGS) $(OPENMP_FLAGS) $< -o $@
+
+$(BUILD_DIR)/algebra_%.bin: test/test_scfd_vector_operations_cpu.cpp $(HEADERS) | $(BUILD_DIR)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(EXTRA_FLAGS) $(OPENMP_FLAGS) -DSCALAR_TYPE=$* $< -o $@
+
+$(BUILD_DIR)/product.bin: test/test_product_vector_space.cpp $(HEADERS) | $(BUILD_DIR)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(EXTRA_FLAGS) $(OPENMP_FLAGS) $< -o $@
+
+$(BUILD_DIR)/matrix_market.bin: test/test_matrix_market.cpp $(HEADERS) | $(BUILD_DIR)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(EXTRA_FLAGS) $< -o $@
+
+$(BUILD_DIR)/small_dense.bin: test/test_small_dense_linalg.cpp $(HEADERS) | $(BUILD_DIR)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(EXTRA_FLAGS) $< -o $@
+
+$(BUILD_DIR)/io.bin: test/test_io.cpp test/io_header_link.cpp $(HEADERS) | $(BUILD_DIR)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(EXTRA_FLAGS) test/test_io.cpp test/io_header_link.cpp -o $@
+
+$(BUILD_DIR)/multiprecision.bin: test/test_cpu_vector_operations_var_prec.cpp $(HEADERS) | $(BUILD_DIR)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(EXTRA_FLAGS) $< -o $@
+
+test-hierarchy: $(BUILD_DIR)/hierarchy.bin
+	OMP_NUM_THREADS=$(OMP_NUM_THREADS) ./$(BUILD_DIR)/hierarchy.bin
+
+test-glued: $(BUILD_DIR)/glued.bin
+	OMP_NUM_THREADS=$(OMP_NUM_THREADS) ./$(BUILD_DIR)/glued.bin
+
+test-algebra: $(BUILD_DIR)/algebra_float.bin $(BUILD_DIR)/algebra_double.bin $(BUILD_DIR)/product.bin
+	OMP_NUM_THREADS=$(OMP_NUM_THREADS) ./$(BUILD_DIR)/algebra_float.bin
+	OMP_NUM_THREADS=$(OMP_NUM_THREADS) ./$(BUILD_DIR)/algebra_double.bin
+	OMP_NUM_THREADS=$(OMP_NUM_THREADS) ./$(BUILD_DIR)/product.bin
+
+test-io: $(BUILD_DIR)/matrix_market.bin $(BUILD_DIR)/small_dense.bin $(BUILD_DIR)/io.bin
+	./$(BUILD_DIR)/matrix_market.bin
+	./$(BUILD_DIR)/small_dense.bin
+	./$(BUILD_DIR)/io.bin
+
+test-multiprecision: $(BUILD_DIR)/multiprecision.bin
+	./$(BUILD_DIR)/multiprecision.bin
+
+$(BUILD_DIR)/high_precision_cuda.o: include/nmfd/operations/blas1/high_precision/cuda/gpu_reduction_ogita_kernels.cu $(HEADERS) | $(BUILD_DIR)
+	$(NVCC) $(CPPFLAGS) $(NVCCFLAGS) $(EXTRA_FLAGS) -c $< -o $@
+
+$(BUILD_DIR)/hierarchy_cuda.bin: test/test_nmfd_vector_space_hierarchy.cpp $(HEADERS) $(BUILD_DIR)/high_precision_cuda.o
+	$(NVCC) $(CPPFLAGS) $(NVCCFLAGS) $(EXTRA_FLAGS) -DTEST_VECTOR_BACKEND_CUDA -x cu -c $< -o $(BUILD_DIR)/hierarchy_cuda.o
+	$(NVCC) $(NVCCFLAGS) $(EXTRA_FLAGS) $(BUILD_DIR)/hierarchy_cuda.o $(BUILD_DIR)/high_precision_cuda.o -o $@
+
+$(BUILD_DIR)/glued_cuda.bin: test/test_glued_operations.cpp $(HEADERS) $(BUILD_DIR)/high_precision_cuda.o
+	$(NVCC) $(CPPFLAGS) $(NVCCFLAGS) $(EXTRA_FLAGS) -DTEST_GLUED_CUDA -x cu -c $< -o $(BUILD_DIR)/glued_cuda.o
+	$(NVCC) $(NVCCFLAGS) $(EXTRA_FLAGS) $(BUILD_DIR)/glued_cuda.o $(BUILD_DIR)/high_precision_cuda.o -lcublas -o $@
+
+$(BUILD_DIR)/algebra_cuda_%.bin: test/test_scfd_vector_operations.cu $(HEADERS) $(BUILD_DIR)/high_precision_cuda.o
+	$(NVCC) $(CPPFLAGS) $(NVCCFLAGS) $(EXTRA_FLAGS) -DSCALAR_TYPE=$* $< $(BUILD_DIR)/high_precision_cuda.o -o $@
+
+test-cuda: $(CUDA_TESTS)
+	./$(BUILD_DIR)/hierarchy_cuda.bin
+	./$(BUILD_DIR)/glued_cuda.bin
+	./$(BUILD_DIR)/algebra_cuda_float.bin
+	./$(BUILD_DIR)/algebra_cuda_double.bin
+
+check-headers:
+	@set -e; for header in $$(find include -name '*.h' | sort); do \
+	  case "$$header" in */cuda/*|*/hip/*|*/dense_operations_cuda_hip.h) continue;; esac; \
+	  printf '#include <%s>\n' "$${header#include/}" | $(CXX) $(CPPFLAGS) $(CXXFLAGS) $(EXTRA_FLAGS) -x c++ -fsyntax-only -; \
+	done
