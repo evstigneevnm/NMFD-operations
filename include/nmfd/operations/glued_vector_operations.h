@@ -127,16 +127,12 @@ public:
             detail::glued_precision<VectorOperations>::regular( *component );
     }
 
-    bool check_is_valid_number( const vector_type &x ) const
-    {
-        for ( std::size_t i = 0; i < n; ++i )
-            if ( !internal_ops_[i]->check_is_valid_number( x.comp( i ) ) )
-                return false;
-        return true;
-    }
     bool is_valid_number( const vector_type &x ) const override
     {
-        return check_is_valid_number( x );
+        for ( std::size_t i = 0; i < n; ++i )
+            if ( !internal_ops_[i]->is_valid_number( x.comp( i ) ) )
+                return false;
+        return true;
     }
     scalar_type scalar_prod( const vector_type &x, const vector_type &y ) const override
     {

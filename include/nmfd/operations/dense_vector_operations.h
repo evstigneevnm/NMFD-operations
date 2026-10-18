@@ -211,7 +211,7 @@ public:
         copy_type()( static_cast<ordinal_type>( n ), vt_.get_raw_ptr( x ), host );
     }
 
-    bool check_is_valid_number( const vector_type &x ) const
+    bool is_valid_number( const vector_type &x ) const
     {
         if ( get_size( x ) == 0 )
             return true;
@@ -226,11 +226,6 @@ public:
         );
         for_each_inst_.wait();
         return reduce_inst_( get_loc_size( x ), hp, norm_type( 0 ) ) == norm_type( 0 );
-    }
-
-    bool is_valid_number( const vector_type &x ) const
-    {
-        return check_is_valid_number( x );
     }
 
     scalar_type scalar_prod( const vector_type &x, const vector_type &y ) const

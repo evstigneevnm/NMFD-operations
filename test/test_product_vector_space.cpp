@@ -1,6 +1,7 @@
 #include <cmath>
 #include <cstddef>
 #include <iostream>
+#include <limits>
 #include <string>
 #include <vector>
 
@@ -81,6 +82,18 @@ void run_case( const std::string &label )
     space.stop_use_multivector( basis, 2 );
     space.free_multivector( basis, 2 );
     require( basis.empty(), label + " multivector release" );
+
+    require( space.is_valid_number( x ), label + " finite product state" );
+    for ( auto *component : { &x.first, &x.second } )
+    {
+        for ( double invalid : { std::numeric_limits<double>::quiet_NaN(), std::numeric_limits<double>::infinity() } )
+        {
+            component_space.set_value_at_point( invalid, 0, *component );
+            require( !space.is_valid_number( x ), label + " nonfinite entry in either block" );
+        }
+        component_space.assign_scalar( 0.0, *component );
+        require( space.is_valid_number( x ), label + " restored finite product state" );
+    }
 
     space.stop_use_vector( y );
     space.stop_use_vector( x );

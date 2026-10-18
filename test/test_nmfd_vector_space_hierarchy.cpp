@@ -112,9 +112,9 @@ void test_hierarchy()
         );
         require( project_space.norm2_sq( *x ) == norm_type( 4 ), "Project normalized squared norm" );
         operations.assign_scalar( T( std::numeric_limits<norm_type>::max() / norm_type( 2 ) ), *x );
-        require( operations.check_is_valid_number( *x ), "Finite validation does not square large values" );
+        require( operations.is_valid_number( *x ), "Finite validation does not square large values" );
         operations.set_value_at_point( T( std::numeric_limits<norm_type>::infinity() ), 0, *x );
-        require( !operations.check_is_valid_number( *x ), "Finite validation catches nonfinite values" );
+        require( !operations.is_valid_number( *x ), "Finite validation catches nonfinite values" );
     }
 
     space_type                            space( 2 );
@@ -209,7 +209,7 @@ void test_static_validation()
     using space_type = nmfd::operations::static_vector_space<T, 3, scfd::static_vec::vec<T, 3>>;
     space_type                       space;
     typename space_type::vector_type state{ T( 1 ), T( 2 ), T( 3 ) };
-    require( space.check_is_valid_number( state ), "Static space accepts finite states" );
+    require( space.is_valid_number( state ), "Static space accepts finite states" );
     for ( std::size_t i = 0; i < 3; ++i )
     {
         for ( T invalid :
@@ -217,11 +217,11 @@ void test_static_validation()
                 -std::numeric_limits<T>::infinity() } )
         {
             state[i] = invalid;
-            require( !space.check_is_valid_number( state ), "Static space rejects every nonfinite entry" );
+            require( !space.is_valid_number( state ), "Static space rejects every nonfinite entry" );
         }
         state[i] = std::numeric_limits<T>::max();
     }
-    require( space.check_is_valid_number( state ), "Static validity check does not square finite values" );
+    require( space.is_valid_number( state ), "Static validity check does not square finite values" );
 }
 
 template <class T>

@@ -201,14 +201,9 @@ public:
         return sqrt( norm_sq( vector ) );
     }
 
-    bool check_is_valid_number( const vector_type &vector ) const
-    {
-        return first_->check_is_valid_number( vector.first ) && second_->check_is_valid_number( vector.second );
-    }
-
     bool is_valid_number( const vector_type &vector ) const
     {
-        return check_is_valid_number( vector );
+        return first_->is_valid_number( vector.first ) && second_->is_valid_number( vector.second );
     }
 
     void

@@ -272,7 +272,7 @@ public:
         add_lin_comb( mul_x, mx[checked_multivector_index( m, k_ )], mul_y, y );
     }
 
-    bool check_is_valid_number( const vector_type &x ) const
+    bool is_valid_number( const vector_type &x ) const override
     {
         size_t sz_l = x.size();
         for ( size_t i = 0; i < sz_l; ++i )
@@ -284,11 +284,6 @@ public:
         }
 
         return true;
-    }
-
-    bool is_valid_number( const vector_type &x ) const override
-    {
-        return check_is_valid_number( x );
     }
 
     scalar_type scalar_prod( const vector_type &x, const vector_type &y ) const override
