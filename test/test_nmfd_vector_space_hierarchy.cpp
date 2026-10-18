@@ -6,6 +6,7 @@
 #include <utility>
 
 #include <scfd/backend/serial_cpu.h>
+#include <scfd/static_vec/vec.h>
 #ifdef TEST_VECTOR_BACKEND_CUDA
 #    include <scfd/backend/cuda.h>
 #else
@@ -15,6 +16,7 @@
 #include <nmfd/detail/vector_wrap.h>
 #include <nmfd/operations/detail/static_vector_traits.h>
 #include <nmfd/operations/scfd_vector_operations.h>
+#include <nmfd/operations/static_vector_space.h>
 
 namespace
 {
@@ -202,6 +204,27 @@ void test_hierarchy()
 }
 
 template <class T>
+void test_static_validation()
+{
+    using space_type = nmfd::operations::static_vector_space<T, 3, scfd::static_vec::vec<T, 3>>;
+    space_type                       space;
+    typename space_type::vector_type state{ T( 1 ), T( 2 ), T( 3 ) };
+    require( space.check_is_valid_number( state ), "Static space accepts finite states" );
+    for ( std::size_t i = 0; i < 3; ++i )
+    {
+        for ( T invalid :
+              { std::numeric_limits<T>::quiet_NaN(), std::numeric_limits<T>::infinity(),
+                -std::numeric_limits<T>::infinity() } )
+        {
+            state[i] = invalid;
+            require( !space.check_is_valid_number( state ), "Static space rejects every nonfinite entry" );
+        }
+        state[i] = std::numeric_limits<T>::max();
+    }
+    require( space.check_is_valid_number( state ), "Static validity check does not square finite values" );
+}
+
+template <class T>
 void test_static_traits()
 {
     using backend_type = scfd::backend::serial_cpu<std::ptrdiff_t>;
@@ -238,6 +261,9 @@ int main()
         test_hierarchy<backend_type, complex_type>();
         test_static_traits<float>();
         test_static_traits<double>();
+        test_static_validation<float>();
+        test_static_validation<double>();
+        test_static_validation<long double>();
         std::cout << "Checks: " << checks << ", failures: 0\nPASSED\n";
         return 0;
     }
