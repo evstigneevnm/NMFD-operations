@@ -18,7 +18,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        target: [test-hierarchy, test-glued, test-algebra, test-io, test-multiprecision, check-headers]
+        target: [test-hierarchy, test-glued, test-algebra, test-io, test-multiprecision, test-backend, check-headers]
     steps:
       - uses: actions/checkout@v6
         with:

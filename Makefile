@@ -15,19 +15,25 @@ ifneq ($(strip $(BOOST_ROOT)),)
 CPPFLAGS += -I$(BOOST_ROOT)/include
 endif
 HEADERS := $(shell find include test -name '*.h' -o -name '*.cuh')
-CPU_TESTS = $(BUILD_DIR)/hierarchy.bin $(BUILD_DIR)/glued.bin $(BUILD_DIR)/algebra_float.bin $(BUILD_DIR)/algebra_double.bin $(BUILD_DIR)/product.bin $(BUILD_DIR)/matrix_market.bin $(BUILD_DIR)/small_dense.bin $(BUILD_DIR)/io.bin
-CUDA_TESTS = $(BUILD_DIR)/hierarchy_cuda.bin $(BUILD_DIR)/glued_cuda.bin $(BUILD_DIR)/algebra_cuda_float.bin $(BUILD_DIR)/algebra_cuda_double.bin
+CPU_TESTS = $(BUILD_DIR)/hierarchy.bin $(BUILD_DIR)/glued.bin $(BUILD_DIR)/algebra_float.bin $(BUILD_DIR)/algebra_double.bin $(BUILD_DIR)/product.bin $(BUILD_DIR)/matrix_market.bin $(BUILD_DIR)/small_dense.bin $(BUILD_DIR)/io.bin $(BUILD_DIR)/backend.bin
+CUDA_TESTS = $(BUILD_DIR)/hierarchy_cuda.bin $(BUILD_DIR)/glued_cuda.bin $(BUILD_DIR)/algebra_cuda_float.bin $(BUILD_DIR)/algebra_cuda_double.bin $(BUILD_DIR)/backend_cuda.bin
 
-.PHONY: all test test-cpu test-hierarchy test-glued test-algebra test-io test-multiprecision test-cuda check-headers
+.PHONY: all test test-cpu test-hierarchy test-glued test-algebra test-io test-multiprecision test-backend test-cuda check-headers
 all: $(CPU_TESTS)
 test: test-cpu
-test-cpu: test-hierarchy test-glued test-algebra test-io
+test-cpu: test-hierarchy test-glued test-algebra test-io test-backend
 
 $(BUILD_DIR):
 	mkdir -p $@
 
 $(BUILD_DIR)/hierarchy.bin: test/test_nmfd_vector_space_hierarchy.cpp $(HEADERS) | $(BUILD_DIR)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(EXTRA_FLAGS) $(OPENMP_FLAGS) $< -o $@
+
+$(BUILD_DIR)/backend.bin: test/test_backend_utilities.cpp $(HEADERS) | $(BUILD_DIR)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(EXTRA_FLAGS) $(OPENMP_FLAGS) $< -o $@
+
+test-backend: $(BUILD_DIR)/backend.bin
+	OMP_NUM_THREADS=$(OMP_NUM_THREADS) ./$(BUILD_DIR)/backend.bin
 
 $(BUILD_DIR)/glued.bin: test/test_glued_operations.cpp $(HEADERS) | $(BUILD_DIR)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(EXTRA_FLAGS) $(OPENMP_FLAGS) $< -o $@
@@ -76,6 +82,10 @@ $(BUILD_DIR)/hierarchy_cuda.bin: test/test_nmfd_vector_space_hierarchy.cpp $(HEA
 	$(NVCC) $(CPPFLAGS) $(NVCCFLAGS) $(EXTRA_FLAGS) -DTEST_VECTOR_BACKEND_CUDA -x cu -c $< -o $(BUILD_DIR)/hierarchy_cuda.o
 	$(NVCC) $(NVCCFLAGS) $(EXTRA_FLAGS) $(BUILD_DIR)/hierarchy_cuda.o $(BUILD_DIR)/high_precision_cuda.o -o $@
 
+$(BUILD_DIR)/backend_cuda.bin: test/test_backend_utilities.cpp $(HEADERS) $(BUILD_DIR)/high_precision_cuda.o
+	$(NVCC) $(CPPFLAGS) $(NVCCFLAGS) $(EXTRA_FLAGS) -DTEST_BACKEND_CUDA -x cu -c $< -o $(BUILD_DIR)/backend_cuda.o
+	$(NVCC) $(NVCCFLAGS) $(EXTRA_FLAGS) $(BUILD_DIR)/backend_cuda.o $(BUILD_DIR)/high_precision_cuda.o -o $@
+
 $(BUILD_DIR)/glued_cuda.bin: test/test_glued_operations.cpp $(HEADERS) $(BUILD_DIR)/high_precision_cuda.o
 	$(NVCC) $(CPPFLAGS) $(NVCCFLAGS) $(EXTRA_FLAGS) -DTEST_GLUED_CUDA -x cu -c $< -o $(BUILD_DIR)/glued_cuda.o
 	$(NVCC) $(NVCCFLAGS) $(EXTRA_FLAGS) $(BUILD_DIR)/glued_cuda.o $(BUILD_DIR)/high_precision_cuda.o -lcublas -o $@
@@ -84,6 +94,7 @@ $(BUILD_DIR)/algebra_cuda_%.bin: test/test_scfd_vector_operations.cu $(HEADERS) 
 	$(NVCC) $(CPPFLAGS) $(NVCCFLAGS) $(EXTRA_FLAGS) -DSCALAR_TYPE=$* $< $(BUILD_DIR)/high_precision_cuda.o -o $@
 
 test-cuda: $(CUDA_TESTS)
+	./$(BUILD_DIR)/backend_cuda.bin
 	./$(BUILD_DIR)/hierarchy_cuda.bin
 	./$(BUILD_DIR)/glued_cuda.bin
 	./$(BUILD_DIR)/algebra_cuda_float.bin

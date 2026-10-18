@@ -30,9 +30,17 @@ and scoped host-view write-back live in internal helpers. Native SCFD scalar tra
 supply basic real math. Compensated GPU reductions require the kernel object built
 by the Makefile; ordinary header-only consumers do not need it on CPU.
 
+Applications use `nmfd/operations/backend/complex.h`, `math.h`, and `host_view.h`
+with the `nmfd::operations::backend` namespace. These public headers expose the
+same helper types without introducing runtime adapters or duplicate formulas;
+do not include the internal backend-extension headers from application code.
+`make test-backend` verifies this public interface on CPU; CUDA coverage is part
+of `make test-cuda`.
+
 `nmfd/detail/vector_wrap.h` reuses the established NMFD wrapper implementation.
-Solver repositories still carry their older headers until their dependency
-migration; do not mix incompatible operations trees by changing include order.
+Newton and linear-solver repositories consume this dependency rather than
+duplicating supported operations; use a compatible pinned revision throughout
+an assembled application.
 
 `glued_vector`, `glued_vector_operations`, and `glued_vector_space` form homogeneous
 fixed-count block products. Component dimensions may differ. Algebra and factories
