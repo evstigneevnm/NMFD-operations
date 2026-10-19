@@ -4,6 +4,7 @@
 #include <utility>
 
 #include <scfd/utils/device_tag.h>
+#include <scfd/utils/scalar_traits.h>
 
 /************************************************************
  * Backend independent kernels implementing vector operations
@@ -12,6 +13,39 @@
 
 namespace kernels
 {
+
+enum class rect_reduction
+{
+    absolute_sum,
+    maximum,
+    invalid
+};
+
+template <rect_reduction Operation, class IdxND, class T, class VectorType, class ArrayNdType, int TensorDim>
+struct rect_transform
+{
+    VectorType  x;
+    ArrayNdType result;
+
+    __DEVICE_TAG__ void operator()( const IdxND idx ) const
+    {
+        T value = T( 0 );
+        for ( int i = 0; i < TensorDim; ++i )
+        {
+            const T entry = x( idx, i );
+            if constexpr ( Operation == rect_reduction::invalid )
+                value += T( !( entry == entry && entry - entry == T( 0 ) ) );
+            else if constexpr ( Operation == rect_reduction::absolute_sum )
+                value += scfd::utils::scalar_traits<T>::abs( entry );
+            else
+            {
+                const T magnitude = scfd::utils::scalar_traits<T>::abs( entry );
+                value             = magnitude > value ? magnitude : value;
+            }
+        }
+        result( idx ) = value;
+    }
+};
 
 template <class IdxND, class Scalar, class VectorType, class ArrayNdType, int TensorDim>
 struct shur_prod

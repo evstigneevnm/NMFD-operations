@@ -10,6 +10,12 @@ CUDA_ARCH ?= 75
 NVCCFLAGS ?= -std=c++17 -O2 --extended-lambda -gencode arch=compute_$(CUDA_ARCH),code=sm_$(CUDA_ARCH)
 OMP_NUM_THREADS ?= 4
 EXTRA_FLAGS ?=
+MPICXX ?= mpicxx
+MPIEXEC ?= mpiexec
+MPIEXEC_FLAGS ?=
+MPI_NP ?= 2
+MPI_CXXFLAGS ?=
+MPI_LDFLAGS ?=
 CPPFLAGS += -Iinclude -I$(SCFD_ROOT)/include
 ifneq ($(strip $(BOOST_ROOT)),)
 CPPFLAGS += -I$(BOOST_ROOT)/include
@@ -21,7 +27,24 @@ CUDA_TESTS = $(BUILD_DIR)/hierarchy_cuda.bin $(BUILD_DIR)/glued_cuda.bin $(BUILD
 .PHONY: all test test-cpu test-hierarchy test-glued test-algebra test-io test-multiprecision test-backend test-cuda check-headers
 all: $(CPU_TESTS)
 test: test-cpu
-test-cpu: test-hierarchy test-glued test-algebra test-io test-backend
+test-cpu: test-hierarchy test-glued test-algebra test-io test-backend test-rect
+
+.PHONY: test-rect test-rect-mpi
+$(BUILD_DIR)/rect.bin: test/test_rect_vector_space.cpp $(HEADERS) | $(BUILD_DIR)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(EXTRA_FLAGS) $(OPENMP_FLAGS) -DSCFD_ARRAYS_ENABLE_INDEX_SHIFT $< -o $@
+
+$(BUILD_DIR)/rect_mpi.bin: test/test_rect_vector_space.cpp $(HEADERS) | $(BUILD_DIR)
+	$(MPICXX) $(CPPFLAGS) $(CXXFLAGS) $(EXTRA_FLAGS) $(OPENMP_FLAGS) $(MPI_CXXFLAGS) \
+		-DSCFD_ARRAYS_ENABLE_INDEX_SHIFT -DTEST_RECT_MPI $< $(MPI_LDFLAGS) -o $@
+
+$(BUILD_DIR)/rect_cuda.bin: test/test_rect_vector_space.cpp $(HEADERS) | $(BUILD_DIR)
+	$(NVCC) $(CPPFLAGS) $(NVCCFLAGS) $(EXTRA_FLAGS) -DSCFD_ARRAYS_ENABLE_INDEX_SHIFT -DTEST_RECT_CUDA -x cu $< -o $@
+
+test-rect: $(BUILD_DIR)/rect.bin
+	OMP_NUM_THREADS=$(OMP_NUM_THREADS) $<
+
+test-rect-mpi: $(BUILD_DIR)/rect_mpi.bin
+	OMP_NUM_THREADS=$(OMP_NUM_THREADS) $(MPIEXEC) $(MPIEXEC_FLAGS) -n $(MPI_NP) $<
 
 $(BUILD_DIR):
 	mkdir -p $@
@@ -93,7 +116,8 @@ $(BUILD_DIR)/glued_cuda.bin: test/test_glued_operations.cpp $(HEADERS) $(BUILD_D
 $(BUILD_DIR)/algebra_cuda_%.bin: test/test_scfd_vector_operations.cu $(HEADERS) $(BUILD_DIR)/high_precision_cuda.o
 	$(NVCC) $(CPPFLAGS) $(NVCCFLAGS) $(EXTRA_FLAGS) -DSCALAR_TYPE=$* $< $(BUILD_DIR)/high_precision_cuda.o -o $@
 
-test-cuda: $(CUDA_TESTS)
+test-cuda: $(CUDA_TESTS) $(BUILD_DIR)/rect_cuda.bin
+	./$(BUILD_DIR)/rect_cuda.bin
 	./$(BUILD_DIR)/backend_cuda.bin
 	./$(BUILD_DIR)/hierarchy_cuda.bin
 	./$(BUILD_DIR)/glued_cuda.bin

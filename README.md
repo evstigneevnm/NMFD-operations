@@ -11,6 +11,7 @@ cd NMFD-operations
 make -j2 test-cpu
 make check-headers test-multiprecision BOOST_ROOT=/usr/local/boost
 make -j2 test-cuda CONFIG_FILE=build_configs/config_cuda.inc CUDA_ARCH=75
+make test-rect-mpi MPI_NP=4 MPIEXEC_FLAGS=--oversubscribe
 ```
 
 `CONFIG_FILE`, `BUILD_DIR`, `SCFD_ROOT`, `BOOST_ROOT`, and compiler flags can be
@@ -55,6 +56,17 @@ and outputs must not overlap. Coefficient-only updates reuse the geometry; call
 `prepare()` after changing block layouts through shared aliases. Mutable `comp()`
 access invalidates the cache automatically. Instances are not concurrently reusable
 while being modified.
+
+`nmfd::rect_vector_space<T, Dim, TensorDim, Backend, Comm, Ordinal>` owns a
+rectangular local region and optional halos. Its sums, scalar products, validity
+checks and norms are collective over `Comm`; normalized norms use the global
+owned entry count, excluding ghost cells. The default SCFD trivial communicator
+provides the same interface without MPI. The integral fifth-argument form remains
+supported for local callers. Halo allocation requires
+`SCFD_ARRAYS_ENABLE_INDEX_SHIFT`. Spatial operators own halo exchange through
+SCFD distributors; the communication platform must outlive their handles.
+MPI regressions exercise uneven and empty partitions and rank-local nonfinite
+data. MPI builds need an MPI C++ wrapper and launcher (`MPICXX`, `MPIEXEC`).
 
 Historical project-dependent HYPRE adapters remain in `legacy/`, outside the public
 include tree. Other inherited operator utilities are retained without claiming that
