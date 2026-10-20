@@ -6,8 +6,9 @@ serial, OpenMP, CUDA, and HIP backend primitives. No Newton or application heade
 are required by the standalone include tree.
 
 ```sh
-git clone --recurse-submodules https://github.com/evstigneevnm/NMFD-operations.git
+git clone https://github.com/evstigneevnm/NMFD-operations.git
 cd NMFD-operations
+git submodule update --init
 make -j2 test-cpu
 make check-headers test-multiprecision BOOST_ROOT=/usr/local/boost
 make -j2 test-cuda CONFIG_FILE=build_configs/config_cuda.inc CUDA_ARCH=75
@@ -82,4 +83,11 @@ all their optional methods are implemented.
 
 CI separates algebra, hierarchy, glued operations, I/O, multiprecision, and sanitizer checks.
 The optional CUDA dispatch job requires a self-hosted runner labeled `cuda`.
+Pinned jobs use the committed direct `contrib/scfd` dependency. The separate
+`latest-dependencies` job tests the branch selected in `.gitmodules` on pushes,
+pull requests, manual dispatch, and a daily schedule. It logs resolved revisions
+and never commits changed pins. Schedules run from the repository's default branch.
+Only direct dependencies are initialized; recursive dependency checkouts are not needed.
+An integrating project supplies its canonical checkout through `SCFD_ROOT`.
+Local builds use the current working trees and never fetch or switch dependencies.
 Preserve copyright notices and the repository's GPLv2 license.
