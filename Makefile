@@ -21,13 +21,27 @@ ifneq ($(strip $(BOOST_ROOT)),)
 CPPFLAGS += -I$(BOOST_ROOT)/include
 endif
 HEADERS := $(shell find include test -name '*.h' -o -name '*.cuh')
-CPU_TESTS = $(BUILD_DIR)/hierarchy.bin $(BUILD_DIR)/glued.bin $(BUILD_DIR)/algebra_float.bin $(BUILD_DIR)/algebra_double.bin $(BUILD_DIR)/product.bin $(BUILD_DIR)/matrix_market.bin $(BUILD_DIR)/small_dense.bin $(BUILD_DIR)/io.bin $(BUILD_DIR)/backend.bin
-CUDA_TESTS = $(BUILD_DIR)/hierarchy_cuda.bin $(BUILD_DIR)/glued_cuda.bin $(BUILD_DIR)/algebra_cuda_float.bin $(BUILD_DIR)/algebra_cuda_double.bin $(BUILD_DIR)/backend_cuda.bin
+CPU_TESTS = $(BUILD_DIR)/hierarchy.bin $(BUILD_DIR)/glued.bin $(BUILD_DIR)/algebra_float.bin $(BUILD_DIR)/algebra_double.bin $(BUILD_DIR)/product.bin $(BUILD_DIR)/matrix_market.bin $(BUILD_DIR)/small_dense.bin $(BUILD_DIR)/io.bin $(BUILD_DIR)/backend.bin $(BUILD_DIR)/dense.bin
+CUDA_TESTS = $(BUILD_DIR)/hierarchy_cuda.bin $(BUILD_DIR)/glued_cuda.bin $(BUILD_DIR)/algebra_cuda_float.bin $(BUILD_DIR)/algebra_cuda_double.bin $(BUILD_DIR)/backend_cuda.bin $(BUILD_DIR)/dense_cuda.bin
 
 .PHONY: all test test-cpu test-hierarchy test-glued test-algebra test-io test-multiprecision test-backend test-cuda check-headers
 all: $(CPU_TESTS)
 test: test-cpu
-test-cpu: test-hierarchy test-glued test-algebra test-io test-backend test-rect
+test-cpu: test-hierarchy test-glued test-algebra test-io test-backend test-rect test-dense
+
+.PHONY: test-dense test-dense-cuda
+$(BUILD_DIR)/dense.bin: test/test_dense_solve.cpp $(HEADERS) | $(BUILD_DIR)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(EXTRA_FLAGS) $(OPENMP_FLAGS) $< -o $@
+
+test-dense: $(BUILD_DIR)/dense.bin
+	OMP_NUM_THREADS=$(OMP_NUM_THREADS) $<
+
+$(BUILD_DIR)/dense_cuda.bin: test/test_dense_solve.cpp $(HEADERS) $(SCFD_ROOT)/include/scfd/external_libraries/cusolver_wrap.h $(BUILD_DIR)/high_precision_cuda.o
+	$(NVCC) $(CPPFLAGS) $(NVCCFLAGS) $(EXTRA_FLAGS) -DTEST_DENSE_CUDA -x cu -c $< -o $(BUILD_DIR)/dense_cuda.o
+	$(NVCC) $(NVCCFLAGS) $(BUILD_DIR)/dense_cuda.o $(BUILD_DIR)/high_precision_cuda.o -lcublas -lcusolver -o $@
+
+test-dense-cuda: $(BUILD_DIR)/dense_cuda.bin
+	$<
 
 .PHONY: test-rect test-rect-mpi
 $(BUILD_DIR)/rect.bin: test/test_rect_vector_space.cpp $(HEADERS) | $(BUILD_DIR)
@@ -117,6 +131,7 @@ $(BUILD_DIR)/algebra_cuda_%.bin: test/test_scfd_vector_operations.cu $(HEADERS) 
 	$(NVCC) $(CPPFLAGS) $(NVCCFLAGS) $(EXTRA_FLAGS) -DSCALAR_TYPE=$* $< $(BUILD_DIR)/high_precision_cuda.o -o $@
 
 test-cuda: $(CUDA_TESTS) $(BUILD_DIR)/rect_cuda.bin
+	./$(BUILD_DIR)/dense_cuda.bin
 	./$(BUILD_DIR)/rect_cuda.bin
 	./$(BUILD_DIR)/backend_cuda.bin
 	./$(BUILD_DIR)/hierarchy_cuda.bin

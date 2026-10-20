@@ -10,6 +10,23 @@ namespace operations
 namespace kernels
 {
 
+template <class T, class Ordinal, class Traits>
+struct matrix_validate_rows
+{
+    const T *matrix;
+    T       *flags;
+    Ordinal  n;
+    bool     check_diagonal;
+
+    __DEVICE_TAG__ void operator()( Ordinal i ) const
+    {
+        bool valid = !check_diagonal || matrix[i * ( n + 1 )] != T( 0 );
+        for ( Ordinal j = 0; j < n; ++j )
+            valid = Traits::is_finite( matrix[i + j * n] ) && valid;
+        flags[i] = valid ? T( 0 ) : T( 1 );
+    }
+};
+
 template <class MatrixType>
 struct matrix_transpose_2d
 {

@@ -67,21 +67,47 @@ public:
         return result;
     }
 
-    void solve( const matrix_type &mat, const vector_type &b, vector_type &x ) const
+    bool solve( const matrix_type &mat, const vector_type &b, vector_type &x ) const
     {
-        auto &cusolver = solver_wrap_type::inst();
-
+        parent_t::check_solve_dimensions( mat, b, x );
         const auto n = mat.size_nd()[0];
-        parent_t::verify_max_loc_size( n * n + n );
+        if ( n == 0 )
+            return true;
+        auto &cusolver = solver_wrap_type::inst();
+        parent_t::verify_max_loc_size( n * n + 3 * n );
 
         scalar_type *const A_buf = parent_t::helper_.raw_ptr();
         scalar_type *const tau   = A_buf + n * n;
+        vector_type        candidate, invalid;
+        candidate.init_by_raw_data( tau + n, n );
+        invalid.init_by_raw_data( tau + 2 * n, n );
 
         memory_type::copy( sizeof( scalar_type ) * n * n, mat.raw_ptr(), A_buf );
-        memory_type::copy( sizeof( scalar_type ) * n, parent_t::vt_.get_raw_ptr( b ), parent_t::vt_.get_raw_ptr( x ) );
+        parent_t::assign( b, candidate );
+        if ( !valid_matrix( A_buf, invalid, n, false ) || !parent_t::is_valid_number( candidate ) )
+            return false;
 
         cusolver.geqrf( n, n, A_buf, tau );
-        cusolver.gesv_apply_qr( n, A_buf, tau, parent_t::vt_.get_raw_ptr( x ) );
+        if ( !valid_matrix( A_buf, invalid, n, true ) )
+            return false;
+        cusolver.gesv_apply_qr( n, A_buf, tau, candidate.raw_ptr() );
+        if ( !parent_t::is_valid_number( candidate ) )
+            return false;
+        parent_t::assign( candidate, x );
+        return true;
+    }
+
+private:
+    bool valid_matrix(
+        const scalar_type *matrix, vector_type &invalid, typename parent_t::arr_ord n, bool check_diagonal
+    ) const
+    {
+        // One flag per row avoids a matrix-sized validation buffer.
+        using kernel_type = kernels::matrix_validate_rows<
+            scalar_type, typename parent_t::ordinal_type, typename parent_t::scalar_traits>;
+        parent_t::for_each_inst_( kernel_type{ matrix, invalid.raw_ptr(), n, check_diagonal }, n );
+        parent_t::for_each_inst_.wait();
+        return parent_t::sum( invalid ) == scalar_type( 0 );
     }
 };
 

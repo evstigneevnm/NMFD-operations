@@ -1,7 +1,9 @@
 #ifndef __NMFD_DENSE_OPERATIONS_BASE_H__
 #define __NMFD_DENSE_OPERATIONS_BASE_H__
 
+#include <cmath>
 #include <memory>
+#include <stdexcept>
 
 #include <scfd/arrays/array_nd.h>
 #include <scfd/utils/todo.h>
@@ -24,8 +26,9 @@ class dense_operations : public dense_vector_operations<VectorTraits, Backend, O
 {
     static constexpr int Dim = 2;
 
-    using parent_t    = dense_vector_operations<VectorTraits, Backend, Ordinal>;
-    using traits_type = VectorTraits;
+    using parent_t           = dense_vector_operations<VectorTraits, Backend, Ordinal>;
+    using traits_type        = VectorTraits;
+    using scalar_traits_type = typename parent_t::scalar_traits;
 
 public:
     using parent_t::add_lin_comb;
@@ -268,25 +271,44 @@ public:
         return result;
     }
 
-    void solve( const matrix_type &mat, const vector_type &b, vector_type &x ) const
+    bool solve( const matrix_type &mat, const vector_type &b, vector_type &x ) const
     {
         const auto n = mat.size_nd()[0];
-        parent_t::verify_max_loc_size( n * n );
+        check_solve_dimensions( mat, b, x );
+        if ( n == 0 )
+            return true;
+        parent_t::verify_max_loc_size( n * n + n );
 
         matrix_type A;
         A.init_by_raw_data( parent_t::helper_.raw_ptr(), mat.size_nd() );
+        vector_type candidate;
+        candidate.init_by_raw_data( parent_t::helper_.raw_ptr() + n * n, n );
 
-        parent_t::assign( b, x );
+        parent_t::assign( b, candidate );
         assign_matrix( mat, A );
 
         auto A_view = A.create_view( true );
-        auto x_view = x.create_view( true );
-
-        gaussian_elimination( A_view, x_view, n );
-        solve_upper_triangular( A_view, x_view, n );
-
-        A_view.release( false );
+        auto x_view = candidate.create_view( true );
+        if ( !solve_in_place( A_view, x_view, n ) )
+            return false;
         x_view.release( true );
+        parent_t::assign( candidate, x );
+        return true;
+    }
+
+    // Host views may use either layout. The matrix and RHS are disposable workspace.
+    template <class MatView, class VecView>
+    static bool solve_in_place( MatView &A, VecView &rhs, arr_ord n )
+    {
+        for ( arr_ord i = 0; i < n; ++i )
+        {
+            if ( !scalar_traits_type::is_finite( rhs( i ) ) )
+                return false;
+            for ( arr_ord j = 0; j < n; ++j )
+                if ( !scalar_traits_type::is_finite( A( i, j ) ) )
+                    return false;
+        }
+        return gaussian_elimination( A, rhs, n ) && solve_upper_triangular( A, rhs, n );
     }
 
 
@@ -302,14 +324,19 @@ public:
 
 protected:
     template <class MatView, class VecView>
-    static void solve_upper_triangular( const MatView &R, VecView &x, arr_ord n )
+    static bool solve_upper_triangular( const MatView &R, VecView &x, arr_ord n )
     {
         for ( arr_ord j = n; j-- > 0; )
         {
+            if ( R( j, j ) == scalar_type( 0 ) || !scalar_traits_type::is_finite( R( j, j ) ) )
+                return false;
             x( j ) /= R( j, j );
+            if ( !scalar_traits_type::is_finite( x( j ) ) )
+                return false;
             for ( arr_ord k = 0; k < j; ++k )
                 x( k ) -= R( k, j ) * x( j );
         }
+        return true;
     }
 
     template <class MatView>
@@ -330,7 +357,7 @@ protected:
     }
 
     template <class MatView, class VecView>
-    static void gaussian_elimination( MatView &A, VecView &rhs, arr_ord n )
+    static bool gaussian_elimination( MatView &A, VecView &rhs, arr_ord n )
     {
         for ( arr_ord k = 0; k < n; ++k )
         {
@@ -345,18 +372,30 @@ protected:
             }
 
             const auto diag = A( k, k );
+            if ( diag == scalar_type( 0 ) || !scalar_traits_type::is_finite( diag ) )
+                return false;
             for ( arr_ord i = k + 1; i < n; ++i )
             {
                 const auto factor = A( i, k ) / diag;
-                A( i, k )         = scalar_type{ 0 };
+                if ( !scalar_traits_type::is_finite( factor ) )
+                    return false;
+                A( i, k ) = scalar_type{ 0 };
                 for ( arr_ord j = k + 1; j < n; ++j )
                     A( i, j ) -= factor * A( k, j );
                 rhs( i ) -= factor * rhs( k );
             }
         }
+        return true;
     }
 
 protected:
+    void check_solve_dimensions( const matrix_type &mat, const vector_type &b, const vector_type &x ) const
+    {
+        const auto n = mat.size_nd()[0];
+        if ( mat.size_nd()[1] != n || parent_t::get_loc_size( b ) != n || parent_t::get_loc_size( x ) != n )
+            throw std::invalid_argument( "dense_operations::solve: incompatible dimensions" );
+    }
+
     mutable for_each_nd_type for_each_nd_inst_;
 };
 

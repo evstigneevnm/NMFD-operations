@@ -43,6 +43,14 @@ Newton and linear-solver repositories consume this dependency rather than
 duplicating supported operations; use a compatible pinned revision throughout
 an assembled application.
 
+`dense_operations::solve(A, b, x)` and its CUDA/HIP variant return `bool`:
+numerical failure leaves `x` unchanged; incompatible dimensions throw.
+The original matrix and a distinct RHS are preserved. Host `solve_in_place`
+accepts disposable matrix/vector views, including row-major storage, without
+another copy. These methods refactorize on every call; they do not cache factors.
+`make test-dense` checks serial/OMP float and double solves; `test-dense-cuda`
+checks device QR, repeated solves, singular/nonfinite failures, and rollback.
+
 `glued_vector`, `glued_vector_operations`, and `glued_vector_space` form homogeneous
 fixed-count block products. Component dimensions may differ. Algebra and factories
 use the same NMFD hierarchy as dense spaces; complex products conjugate the first

@@ -19,6 +19,7 @@ template <class T, int Dim, class Vector = std::array<T, Dim>>
 struct static_vector_space
 {
     using scalar_type = T;
+    using norm_type   = T;
     using vector_type = Vector;
 
     size_t size() const
