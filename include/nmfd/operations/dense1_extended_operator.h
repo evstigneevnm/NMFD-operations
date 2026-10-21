@@ -147,8 +147,8 @@ public:
 
 
 private:
-    using orig_vector_wrap_t   = detail::vector_wrap<orig_vector_space_type, true, true>;
-    using scalar_vector_wrap_t = detail::vector_wrap<scalar_space_type, true, true>;
+    using orig_vector_wrap_t   = nmfd::detail::vector_wrap<orig_vector_space_type, true, true>;
+    using scalar_vector_wrap_t = nmfd::detail::vector_wrap<scalar_space_type, true, true>;
 
     std::shared_ptr<orig_vector_space_type> orig_vec_space_;
     std::shared_ptr<scalar_space_type>      scalar_space_;
