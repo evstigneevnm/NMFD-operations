@@ -52,6 +52,16 @@ another copy. These methods refactorize on every call; they do not cache factors
 `make test-dense` checks serial/OMP float and double solves; `test-dense-cuda`
 checks device QR, repeated solves, singular/nonfinite failures, and rollback.
 
+Optional `backend/boost_multiprecision.h` specializes the existing scalar math
+interface for host Boost numbers; the variable-precision vector-space header
+includes it automatically. Native backend headers do not require Boost.
+Host `solve_in_place` also accepts borrowed views over `std::vector<T>` storage
+for these scalars, without allocating SCFD arrays of nontrivial objects.
+`test-multiprecision` checks the dense solve below double precision, with
+expression templates enabled and disabled, plus scalar finiteness and exponent
+range. Elimination coefficients are materialized before their source entries
+are overwritten, so lazy scalar expressions cannot change a computed factor.
+
 `glued_vector`, `glued_vector_operations`, and `glued_vector_space` form homogeneous
 fixed-count block products. Component dimensions may differ. Algebra and factories
 use the same NMFD hierarchy as dense spaces; complex products conjugate the first

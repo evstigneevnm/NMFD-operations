@@ -35,12 +35,20 @@ struct math
 
     __DEVICE_TAG__ static bool is_finite( const T &x )
     {
-        return ( x == x ) && ( ( x - x ) == T( 0 ) );
+        if constexpr ( std::is_floating_point<T>::value )
+            return std::isfinite( x );
+        else
+            return ( x == x ) && ( ( x - x ) == T( 0 ) );
     }
 
     __DEVICE_TAG__ static T sqrt( const T &x )
     {
         return scfd::utils::scalar_traits<T>::sqrt( x );
+    }
+
+    __DEVICE_TAG__ static T hypot( const T &x, const T &y )
+    {
+        return std::hypot( x, y );
     }
 
     __DEVICE_TAG__ static T sin( const T &x )

@@ -9,6 +9,7 @@
 #include <scfd/utils/todo.h>
 
 #include <nmfd/operations/default_multivector_operations_base.h>
+#include <nmfd/operations/backend/math.h>
 #include <nmfd/operations/detail/scfd_array_traits.h>
 #include <nmfd/operations/dense_vector_space.h>
 #include <nmfd/operations/kernels/dense_operations.h>
@@ -343,10 +344,10 @@ protected:
     static arr_ord select_pivot( MatView &A, arr_ord n, arr_ord k )
     {
         arr_ord pivot = k;
-        auto    pval  = std::abs( A( k, k ) );
+        auto    pval  = pivot_magnitude( A( k, k ) );
         for ( arr_ord i = k + 1; i < n; ++i )
         {
-            const auto v = std::abs( A( i, k ) );
+            const auto v = pivot_magnitude( A( i, k ) );
             if ( v > pval )
             {
                 pval  = v;
@@ -354,6 +355,14 @@ protected:
             }
         }
         return pivot;
+    }
+
+    static typename parent_t::norm_type pivot_magnitude( const scalar_type &value )
+    {
+        if constexpr ( scalar_traits_type::is_complex )
+            return std::abs( value );
+        else
+            return backend::math<Backend, scalar_type>::abs( value );
     }
 
     template <class MatView, class VecView>
@@ -376,7 +385,7 @@ protected:
                 return false;
             for ( arr_ord i = k + 1; i < n; ++i )
             {
-                const auto factor = A( i, k ) / diag;
+                const scalar_type factor = A( i, k ) / diag;
                 if ( !scalar_traits_type::is_finite( factor ) )
                     return false;
                 A( i, k ) = scalar_type{ 0 };

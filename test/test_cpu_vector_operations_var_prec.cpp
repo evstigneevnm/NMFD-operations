@@ -8,6 +8,8 @@
 #include <vector>
 
 #include <nmfd/operations/cpu_vector_operations_var_prec.h>
+#include <scfd/backend/serial_cpu.h>
+#include <nmfd/operations/dense_operations_base.h>
 
 namespace
 {
@@ -228,12 +230,68 @@ void run_var_prec_tests( test_report &report )
     vec_ops.free_vectors( x, y, z, y_long, z_long, short_x, normal_x );
 }
 
+template <class T>
+void run_dense_tests( test_report &report )
+{
+    using math_type  = nmfd::operations::backend::math<void, T>;
+    using dense_type = nmfd::operations::dense_operations<T, scfd::backend::serial_cpu<std::ptrdiff_t>>;
+    const T        delta( "1e-35" );
+    const T        tolerance( "1e-50" );
+    std::vector<T> matrix{ 0, 1, 1, 1, 1, T( 1 ) + delta, 1, T( 1 ) + delta, 1 };
+    std::vector<T> exact{ T( 1 ), T( -2 ), T( 3 ) };
+    std::vector<T> rhs( 3, T( 0 ) );
+    for ( int i = 0; i < 3; ++i )
+        for ( int j = 0; j < 3; ++j )
+            rhs[i] += matrix[3 * i + j] * exact[j];
+    const auto                                                                               original_matrix = matrix;
+    const auto                                                                               original_rhs    = rhs;
+    scfd::arrays::array_nd<T, 2, scfd::memory::host, scfd::arrays::last_index_fast_arranger> a;
+    scfd::arrays::array<T, scfd::memory::host>                                               b;
+    a.init_by_raw_data( matrix.data(), 3, 3 );
+    b.init_by_raw_data( rhs.data(), 3 );
+    report.require( dense_type::solve_in_place( a, b, 3 ), "multiprecision pivoted dense solve" );
+    for ( int i = 0; i < 3; ++i )
+    {
+        report.require(
+            math_type::abs( rhs[i] - exact[i] ) < tolerance, "dense solution retains sub-double information"
+        );
+        T residual = -original_rhs[i];
+        for ( int j = 0; j < 3; ++j )
+            residual += original_matrix[3 * i + j] * rhs[j];
+        report.require( math_type::abs( residual ) < tolerance, "dense true residual in original precision" );
+    }
+    std::fill( matrix.begin(), matrix.end(), T( 0 ) );
+    report.require( !dense_type::solve_in_place( a, b, 3 ), "singular multiprecision matrix fails" );
+    std::copy( original_matrix.begin(), original_matrix.end(), matrix.begin() );
+    std::copy( original_rhs.begin(), original_rhs.end(), rhs.begin() );
+    matrix[0] = std::numeric_limits<T>::infinity();
+    report.require( !dense_type::solve_in_place( a, b, 3 ), "nonfinite multiprecision matrix fails" );
+    std::copy( original_matrix.begin(), original_matrix.end(), matrix.begin() );
+    rhs[0] = std::numeric_limits<T>::quiet_NaN();
+    report.require( !dense_type::solve_in_place( a, b, 3 ), "nonfinite multiprecision RHS fails" );
+    const T huge( "1e1000" );
+    report.require(
+        math_type::hypot( huge, huge ) > huge && math_type::is_finite( math_type::hypot( huge, huge ) ),
+        "hypot retains the multiprecision exponent range"
+    );
+    report.require(
+        !math_type::is_finite( std::numeric_limits<T>::quiet_NaN() ) &&
+            !math_type::is_finite( std::numeric_limits<T>::infinity() ),
+        "scalar nonfinite detection"
+    );
+}
+
 } // namespace
 
 int main()
 {
     test_report report;
     run_var_prec_tests( report );
+    run_dense_tests<typename cpu_vector_operations_var_prec<100>::scalar_type>( report );
+    run_dense_tests<
+        boost::multiprecision::number<boost::multiprecision::cpp_bin_float<100>, boost::multiprecision::et_on>>(
+        report
+    );
 
     std::cout << "Checks: " << report.checks << ", failures: " << report.failures << std::endl;
     if ( report.failures == 0 )

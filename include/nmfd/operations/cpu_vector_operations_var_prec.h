@@ -16,6 +16,7 @@
 #include <chrono>
 
 #include <nmfd/operations/vector_space_base.h>
+#include <nmfd/operations/backend/boost_multiprecision.h>
 
 namespace nmfd_operations_detail
 {
