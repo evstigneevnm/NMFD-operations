@@ -25,7 +25,7 @@ ifneq ($(strip $(BOOST_ROOT)),)
 CPPFLAGS += -I$(BOOST_ROOT)/include
 endif
 HEADERS := $(shell find include test -name '*.h' -o -name '*.cuh')
-CPU_TESTS = $(BUILD_DIR)/hierarchy.bin $(BUILD_DIR)/glued.bin $(BUILD_DIR)/algebra_float.bin $(BUILD_DIR)/algebra_double.bin $(BUILD_DIR)/product.bin $(BUILD_DIR)/product_lifetime.bin $(BUILD_DIR)/matrix_market.bin $(BUILD_DIR)/small_dense.bin $(BUILD_DIR)/io.bin $(BUILD_DIR)/backend.bin $(BUILD_DIR)/dense.bin
+CPU_TESTS = $(BUILD_DIR)/hierarchy.bin $(BUILD_DIR)/glued.bin $(BUILD_DIR)/algebra_float.bin $(BUILD_DIR)/algebra_double.bin $(BUILD_DIR)/product.bin $(BUILD_DIR)/product_lifetime.bin $(BUILD_DIR)/block_operator.bin $(BUILD_DIR)/two_block_access.bin $(BUILD_DIR)/matrix_market.bin $(BUILD_DIR)/small_dense.bin $(BUILD_DIR)/io.bin $(BUILD_DIR)/backend.bin $(BUILD_DIR)/dense.bin
 CUDA_TESTS = $(BUILD_DIR)/hierarchy_cuda.bin $(BUILD_DIR)/glued_cuda.bin $(BUILD_DIR)/algebra_cuda_float.bin $(BUILD_DIR)/algebra_cuda_double.bin $(BUILD_DIR)/product_cuda.bin $(BUILD_DIR)/backend_cuda.bin $(BUILD_DIR)/dense_cuda.bin
 
 .PHONY: all test test-cpu test-hierarchy test-glued test-algebra test-io test-multiprecision test-backend test-cuda check-headers
@@ -88,6 +88,17 @@ $(BUILD_DIR)/product.bin: test/test_product_vector_space.cpp $(HEADERS) | $(BUIL
 $(BUILD_DIR)/product_lifetime.bin: test/test_product_vector_space_lifetime.cpp $(HEADERS) | $(BUILD_DIR)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(EXTRA_FLAGS) $(OPENMP_FLAGS) $< -o $@
 
+$(BUILD_DIR)/block_operator.bin: test/test_block_operator.cpp $(HEADERS) | $(BUILD_DIR)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(EXTRA_FLAGS) $(OPENMP_FLAGS) $< -o $@
+
+$(BUILD_DIR)/two_block_access.bin: test/test_two_block_access.cpp $(HEADERS) | $(BUILD_DIR)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(EXTRA_FLAGS) $(OPENMP_FLAGS) $< -o $@
+
+.PHONY: test-block
+test-block: $(BUILD_DIR)/block_operator.bin $(BUILD_DIR)/two_block_access.bin
+	$(BUILD_DIR)/block_operator.bin
+	$(BUILD_DIR)/two_block_access.bin
+
 $(BUILD_DIR)/product_mpi.bin: test/test_product_vector_space_mpi.cpp $(HEADERS) | $(BUILD_DIR)
 	$(MPICXX) $(CPPFLAGS) $(CXXFLAGS) $(EXTRA_FLAGS) $(OPENMP_FLAGS) $(MPI_CXXFLAGS) $< $(MPI_LDFLAGS) -o $@
 
@@ -117,7 +128,7 @@ test-hierarchy: $(BUILD_DIR)/hierarchy.bin
 test-glued: $(BUILD_DIR)/glued.bin
 	OMP_NUM_THREADS=$(OMP_NUM_THREADS) ./$(BUILD_DIR)/glued.bin
 
-test-algebra: $(BUILD_DIR)/algebra_float.bin $(BUILD_DIR)/algebra_double.bin test-product
+test-algebra: $(BUILD_DIR)/algebra_float.bin $(BUILD_DIR)/algebra_double.bin test-product test-block
 	OMP_NUM_THREADS=$(OMP_NUM_THREADS) ./$(BUILD_DIR)/algebra_float.bin
 	OMP_NUM_THREADS=$(OMP_NUM_THREADS) ./$(BUILD_DIR)/algebra_double.bin
 
