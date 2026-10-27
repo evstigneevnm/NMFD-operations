@@ -159,15 +159,6 @@ public:
         return last_reduction_high_precision_;
     }
 
-    vector_type &at( multivector_type &x, std::size_t m, std::size_t k ) const
-    {
-        if ( k >= m )
-        {
-            throw std::out_of_range( "scfd_vector_operations::at" );
-        }
-        return x[k];
-    }
-
     auto view( vector_type &x, bool sync_from_array = true, bool sync_to_array_on_destroy = false ) const
     {
         return typename host_view_traits::scoped_view_type( x, sync_from_array, sync_to_array_on_destroy );
