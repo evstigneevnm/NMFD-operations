@@ -43,13 +43,13 @@ jobs:
       - uses: actions/checkout@v6
         with:
           submodules: true
-      - run: make test-hierarchy test-glued test-rect test-dense EXTRA_FLAGS="-O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer"
+      - run: make test-hierarchy test-glued test-product test-rect test-dense EXTRA_FLAGS="-O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer"
         env:
           ASAN_OPTIONS: detect_leaks=1
 
   mpi:
     if: github.event_name != 'schedule'
-    name: Rectangular space / MPI / ${{ matrix.ranks }} ranks
+    name: Rectangular and product spaces / MPI / ${{ matrix.ranks }} ranks
     runs-on: ubuntu-latest
     timeout-minutes: 10
     strategy:
@@ -61,7 +61,7 @@ jobs:
         with:
           submodules: true
       - run: sudo apt-get update && sudo apt-get install -y openmpi-bin libopenmpi-dev
-      - run: make test-rect-mpi MPI_NP=${{ matrix.ranks }} MPIEXEC_FLAGS=--oversubscribe OMP_NUM_THREADS=2
+      - run: make test-rect-mpi test-product-mpi MPI_NP=${{ matrix.ranks }} MPIEXEC_FLAGS=--oversubscribe OMP_NUM_THREADS=2
 
   cuda:
     if: github.event_name == 'workflow_dispatch' && inputs.run_cuda
@@ -93,5 +93,5 @@ jobs:
       - run: sudo apt-get update && sudo apt-get install -y libboost-dev openmpi-bin libopenmpi-dev
       - name: Verify latest dependencies without changing pins
         run: |
-          make -j2 test-cpu test-multiprecision check-headers test-rect-mpi \
+          make -j2 test-cpu test-multiprecision check-headers test-rect-mpi test-product-mpi \
             BUILD_DIR=build/latest MPI_NP=2 MPIEXEC_FLAGS=--oversubscribe OMP_NUM_THREADS=2

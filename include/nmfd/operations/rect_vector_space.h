@@ -157,6 +157,20 @@ public:
         return range;
     }
 
+    // Scalar counts exclude halos; size()/get_size() retain their grid-shape interface.
+    std::size_t get_default_size() const noexcept
+    {
+        return static_cast<std::size_t>( points_ ) * TensorDim;
+    }
+    std::size_t get_vector_size() const noexcept
+    {
+        return get_default_size();
+    }
+    std::size_t get_size( const vector_type & ) const noexcept
+    {
+        return get_default_size();
+    }
+
 public:
     void init_vector( vector_type &x ) const override
     {

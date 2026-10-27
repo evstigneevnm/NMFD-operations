@@ -3,8 +3,10 @@
 
 #include <cmath>
 #include <array>
+#include <cstddef>
 #include <iterator>
 #include <algorithm>
+#include <stdexcept>
 #include <vector>
 
 /// TODO systemize size_t behaviour - mb make some Vector dependent type?
@@ -18,9 +20,35 @@ namespace operations
 template <class T, int Dim, class Vector = std::array<T, Dim>>
 struct static_vector_space
 {
-    using scalar_type = T;
-    using norm_type   = T;
-    using vector_type = Vector;
+    using scalar_type  = T;
+    using norm_type    = T;
+    using vector_type  = Vector;
+    using ordinal_type = std::ptrdiff_t;
+    using Ord          = ordinal_type;
+
+    size_t get_default_size() const
+    {
+        return Dim;
+    }
+    size_t get_vector_size() const
+    {
+        return Dim;
+    }
+
+    void set( const scalar_type *host, vector_type &x, std::size_t count ) const
+    {
+        if ( count != std::size_t( Dim ) )
+            throw std::invalid_argument( "static_vector_space::set size mismatch" );
+        for ( std::size_t i = 0; i < count; ++i )
+            x[i] = host[i];
+    }
+    void get( const vector_type &x, scalar_type *host, std::size_t count ) const
+    {
+        if ( count != std::size_t( Dim ) )
+            throw std::invalid_argument( "static_vector_space::get size mismatch" );
+        for ( std::size_t i = 0; i < count; ++i )
+            host[i] = x[i];
+    }
 
     size_t size() const
     {

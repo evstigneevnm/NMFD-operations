@@ -6,6 +6,10 @@ SCFD_ROOT ?= contrib/scfd
 BOOST_ROOT ?=
 CUDA_ROOT ?= /usr/local/cuda
 NVCC ?= $(CUDA_ROOT)/bin/nvcc
+HIPCC ?= hipcc
+HIPFLAGS ?= -std=c++17 -O2
+HIP_LANGUAGE ?= hip
+HIP_EXTRA_OBJECTS ?=
 CUDA_ARCH ?= 75
 NVCCFLAGS ?= -std=c++17 -O2 --extended-lambda -gencode arch=compute_$(CUDA_ARCH),code=sm_$(CUDA_ARCH)
 OMP_NUM_THREADS ?= 4
@@ -21,8 +25,8 @@ ifneq ($(strip $(BOOST_ROOT)),)
 CPPFLAGS += -I$(BOOST_ROOT)/include
 endif
 HEADERS := $(shell find include test -name '*.h' -o -name '*.cuh')
-CPU_TESTS = $(BUILD_DIR)/hierarchy.bin $(BUILD_DIR)/glued.bin $(BUILD_DIR)/algebra_float.bin $(BUILD_DIR)/algebra_double.bin $(BUILD_DIR)/product.bin $(BUILD_DIR)/matrix_market.bin $(BUILD_DIR)/small_dense.bin $(BUILD_DIR)/io.bin $(BUILD_DIR)/backend.bin $(BUILD_DIR)/dense.bin
-CUDA_TESTS = $(BUILD_DIR)/hierarchy_cuda.bin $(BUILD_DIR)/glued_cuda.bin $(BUILD_DIR)/algebra_cuda_float.bin $(BUILD_DIR)/algebra_cuda_double.bin $(BUILD_DIR)/backend_cuda.bin $(BUILD_DIR)/dense_cuda.bin
+CPU_TESTS = $(BUILD_DIR)/hierarchy.bin $(BUILD_DIR)/glued.bin $(BUILD_DIR)/algebra_float.bin $(BUILD_DIR)/algebra_double.bin $(BUILD_DIR)/product.bin $(BUILD_DIR)/product_lifetime.bin $(BUILD_DIR)/matrix_market.bin $(BUILD_DIR)/small_dense.bin $(BUILD_DIR)/io.bin $(BUILD_DIR)/backend.bin $(BUILD_DIR)/dense.bin
+CUDA_TESTS = $(BUILD_DIR)/hierarchy_cuda.bin $(BUILD_DIR)/glued_cuda.bin $(BUILD_DIR)/algebra_cuda_float.bin $(BUILD_DIR)/algebra_cuda_double.bin $(BUILD_DIR)/product_cuda.bin $(BUILD_DIR)/backend_cuda.bin $(BUILD_DIR)/dense_cuda.bin
 
 .PHONY: all test test-cpu test-hierarchy test-glued test-algebra test-io test-multiprecision test-backend test-cuda check-headers
 all: $(CPU_TESTS)
@@ -81,6 +85,20 @@ $(BUILD_DIR)/algebra_%.bin: test/test_scfd_vector_operations_cpu.cpp $(HEADERS) 
 $(BUILD_DIR)/product.bin: test/test_product_vector_space.cpp $(HEADERS) | $(BUILD_DIR)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(EXTRA_FLAGS) $(OPENMP_FLAGS) $< -o $@
 
+$(BUILD_DIR)/product_lifetime.bin: test/test_product_vector_space_lifetime.cpp $(HEADERS) | $(BUILD_DIR)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(EXTRA_FLAGS) $(OPENMP_FLAGS) $< -o $@
+
+$(BUILD_DIR)/product_mpi.bin: test/test_product_vector_space_mpi.cpp $(HEADERS) | $(BUILD_DIR)
+	$(MPICXX) $(CPPFLAGS) $(CXXFLAGS) $(EXTRA_FLAGS) $(OPENMP_FLAGS) $(MPI_CXXFLAGS) $< $(MPI_LDFLAGS) -o $@
+
+.PHONY: test-product test-product-mpi test-product-cuda test-product-hip
+test-product: $(BUILD_DIR)/product.bin $(BUILD_DIR)/product_lifetime.bin
+	OMP_NUM_THREADS=$(OMP_NUM_THREADS) $(BUILD_DIR)/product.bin
+	OMP_NUM_THREADS=$(OMP_NUM_THREADS) $(BUILD_DIR)/product_lifetime.bin
+
+test-product-mpi: $(BUILD_DIR)/product_mpi.bin
+	OMP_NUM_THREADS=$(OMP_NUM_THREADS) $(MPIEXEC) $(MPIEXEC_FLAGS) -n $(MPI_NP) $<
+
 $(BUILD_DIR)/matrix_market.bin: test/test_matrix_market.cpp $(HEADERS) | $(BUILD_DIR)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(EXTRA_FLAGS) $< -o $@
 
@@ -99,10 +117,9 @@ test-hierarchy: $(BUILD_DIR)/hierarchy.bin
 test-glued: $(BUILD_DIR)/glued.bin
 	OMP_NUM_THREADS=$(OMP_NUM_THREADS) ./$(BUILD_DIR)/glued.bin
 
-test-algebra: $(BUILD_DIR)/algebra_float.bin $(BUILD_DIR)/algebra_double.bin $(BUILD_DIR)/product.bin
+test-algebra: $(BUILD_DIR)/algebra_float.bin $(BUILD_DIR)/algebra_double.bin test-product
 	OMP_NUM_THREADS=$(OMP_NUM_THREADS) ./$(BUILD_DIR)/algebra_float.bin
 	OMP_NUM_THREADS=$(OMP_NUM_THREADS) ./$(BUILD_DIR)/algebra_double.bin
-	OMP_NUM_THREADS=$(OMP_NUM_THREADS) ./$(BUILD_DIR)/product.bin
 
 test-io: $(BUILD_DIR)/matrix_market.bin $(BUILD_DIR)/small_dense.bin $(BUILD_DIR)/io.bin
 	./$(BUILD_DIR)/matrix_market.bin
@@ -127,10 +144,25 @@ $(BUILD_DIR)/glued_cuda.bin: test/test_glued_operations.cpp $(HEADERS) $(BUILD_D
 	$(NVCC) $(CPPFLAGS) $(NVCCFLAGS) $(EXTRA_FLAGS) -DTEST_GLUED_CUDA -x cu -c $< -o $(BUILD_DIR)/glued_cuda.o
 	$(NVCC) $(NVCCFLAGS) $(EXTRA_FLAGS) $(BUILD_DIR)/glued_cuda.o $(BUILD_DIR)/high_precision_cuda.o -lcublas -o $@
 
+$(BUILD_DIR)/product_cuda.bin: test/test_product_vector_space.cpp $(HEADERS) $(BUILD_DIR)/high_precision_cuda.o
+	$(NVCC) $(CPPFLAGS) $(NVCCFLAGS) $(EXTRA_FLAGS) -DTEST_PRODUCT_CUDA -x cu -c $< -o $(BUILD_DIR)/product_cuda.o
+	$(NVCC) $(NVCCFLAGS) $(EXTRA_FLAGS) $(BUILD_DIR)/product_cuda.o $(BUILD_DIR)/high_precision_cuda.o -o $@
+
+test-product-cuda: $(BUILD_DIR)/product_cuda.bin
+	$<
+
+$(BUILD_DIR)/product_hip.bin: test/test_product_vector_space.cpp $(HEADERS) $(HIP_EXTRA_OBJECTS) | $(BUILD_DIR)
+	$(HIPCC) $(CPPFLAGS) $(HIPFLAGS) $(EXTRA_FLAGS) -DTEST_PRODUCT_HIP -x $(HIP_LANGUAGE) -c $< -o $(BUILD_DIR)/product_hip.o
+	$(HIPCC) $(HIPFLAGS) $(EXTRA_FLAGS) $(BUILD_DIR)/product_hip.o $(HIP_EXTRA_OBJECTS) -o $@
+
+test-product-hip: $(BUILD_DIR)/product_hip.bin
+	$<
+
 $(BUILD_DIR)/algebra_cuda_%.bin: test/test_scfd_vector_operations.cu $(HEADERS) $(BUILD_DIR)/high_precision_cuda.o
 	$(NVCC) $(CPPFLAGS) $(NVCCFLAGS) $(EXTRA_FLAGS) -DSCALAR_TYPE=$* $< $(BUILD_DIR)/high_precision_cuda.o -o $@
 
 test-cuda: $(CUDA_TESTS) $(BUILD_DIR)/rect_cuda.bin
+	./$(BUILD_DIR)/product_cuda.bin
 	./$(BUILD_DIR)/dense_cuda.bin
 	./$(BUILD_DIR)/rect_cuda.bin
 	./$(BUILD_DIR)/backend_cuda.bin
