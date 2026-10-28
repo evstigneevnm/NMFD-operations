@@ -9,6 +9,7 @@
 #include <type_traits>
 #include <utility>
 #include <vector>
+#include <nmfd/operations/backend/math.h>
 
 namespace nmfd
 {
@@ -357,7 +358,7 @@ public:
 
     norm_type norm( const vector_type &vector ) const
     {
-        return std::sqrt( norm_sq( vector ) );
+        return backend::math<void, norm_type>::sqrt( norm_sq( vector ) );
     }
 
     // Preserve the pair-space metric: these aliases do not normalize either block.

@@ -574,6 +574,11 @@ public:
         add_mul( mul_x, x, mul_y, y );
     }
 
+    void add_lin_comb( const scalar_type mul_x, const vector_type &x, vector_type &y ) const
+    {
+        add_mul( mul_x, x, scalar_type( 1 ), y );
+    }
+
     //calc: z := mul_x*x + mul_y*y + mul_z*z
     void add_mul(
         scalar_type mul_x, const vector_type &x, scalar_type mul_y, const vector_type &y, scalar_type mul_z,

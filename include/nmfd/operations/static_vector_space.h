@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <stdexcept>
 #include <vector>
+#include <nmfd/operations/backend/math.h>
 
 /// TODO systemize size_t behaviour - mb make some Vector dependent type?
 /// TODO multivector - add some generic wrap for multivector (std::vector) and use it here
@@ -21,6 +22,7 @@ template <class T, int Dim, class Vector = std::array<T, Dim>>
 struct static_vector_space
 {
     using scalar_type  = T;
+    using math_type    = backend::math<void, T>;
     using norm_type    = T;
     using vector_type  = Vector;
     using ordinal_type = std::ptrdiff_t;
@@ -92,7 +94,7 @@ struct static_vector_space
     {
         for ( size_t i = 0; i < Dim; ++i )
         {
-            if ( !std::isfinite( x[i] ) )
+            if ( !math_type::is_finite( x[i] ) )
             {
                 return false;
             }
@@ -116,7 +118,7 @@ struct static_vector_space
 
     [[nodiscard]] scalar_type norm( const vector_type &x ) const
     {
-        return std::sqrt( scalar_prod( x, x ) );
+        return math_type::sqrt( scalar_prod( x, x ) );
     }
     [[nodiscard]] scalar_type norm_sq( const vector_type &x ) const
     {
@@ -128,7 +130,7 @@ struct static_vector_space
     }
     [[nodiscard]] scalar_type norm2( const vector_type &x ) const
     {
-        return std::sqrt( scalar_prod( x, x ) );
+        return math_type::sqrt( scalar_prod( x, x ) );
     }
     [[nodiscard]] scalar_type norm_l2_sq( const vector_type &x ) const
     {
@@ -136,7 +138,7 @@ struct static_vector_space
     }
     [[nodiscard]] scalar_type norm_l2( const vector_type &x ) const
     {
-        return std::sqrt( scalar_prod( x, x ) );
+        return math_type::sqrt( scalar_prod( x, x ) );
     }
     /// asum(x)
     [[nodiscard]] scalar_type norm1( const vector_type &x ) const
@@ -153,7 +155,7 @@ struct static_vector_space
         scalar_type max_val = 0.0;
         for ( size_t j = 0; j < Dim; j++ )
         {
-            max_val = ( max_val < std::abs( x[j] ) ) ? std::abs( x[j] ) : max_val;
+            max_val = ( max_val < math_type::abs( x[j] ) ) ? math_type::abs( x[j] ) : max_val;
         }
         return max_val;
     }
@@ -178,7 +180,7 @@ struct static_vector_space
         scalar_type res = 0.0;
         for ( size_t j = 0; j < Dim; j++ )
         {
-            res += std::abs( x[j] );
+            res += math_type::abs( x[j] );
         }
         return res;
     }
@@ -268,14 +270,14 @@ struct static_vector_space
     {
         for ( size_t j = 0; j < Dim; j++ )
         {
-            y[j] = std::abs( x[j] );
+            y[j] = math_type::abs( x[j] );
         }
     }
     void make_abs( vector_type &x ) const
     {
         for ( size_t j = 0; j < Dim; j++ )
         {
-            auto xa = std::abs( x[j] );
+            auto xa = math_type::abs( x[j] );
             x[j]    = xa;
         }
     }

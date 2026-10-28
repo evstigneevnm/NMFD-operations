@@ -9,6 +9,7 @@
 #include <limits>
 #include <stdexcept>
 #include <type_traits>
+#include <nmfd/operations/backend/math.h>
 
 namespace nmfd
 {
@@ -209,7 +210,11 @@ small_solve_info<T> factor_lu(
     small_matrix<T, MaxN, MaxN> &lu, std::array<std::size_t, MaxN> &pivots, T singular_tol = T{}, T condition_tol = T{}
 )
 {
-    static_assert( std::is_floating_point<T>::value, "factor_lu currently expects a real floating point type" );
+    static_assert(
+        std::numeric_limits<T>::is_specialized && !std::numeric_limits<T>::is_integer,
+        "factor_lu requires a real non-integer scalar with numeric_limits"
+    );
+    using math_type = nmfd::operations::backend::math<void, T>;
 
     small_solve_info<T> info;
     const std::size_t   n = lu.rows();
@@ -227,7 +232,7 @@ small_solve_info<T> factor_lu(
     T max_abs_entry = T{};
     for ( std::size_t i = 0; i < n; ++i )
         for ( std::size_t j = 0; j < n; ++j )
-            max_abs_entry = std::max( max_abs_entry, static_cast<T>( std::abs( lu( i, j ) ) ) );
+            max_abs_entry = std::max( max_abs_entry, math_type::abs( lu( i, j ) ) );
 
     const T scale = std::max( T{ 1 }, max_abs_entry );
     const T tol   = singular_tol > T{} ? singular_tol : std::numeric_limits<T>::epsilon() * scale * static_cast<T>( n );
@@ -239,10 +244,10 @@ small_solve_info<T> factor_lu(
     for ( std::size_t k = 0; k < n; ++k )
     {
         std::size_t pivot     = k;
-        T           pivot_abs = static_cast<T>( std::abs( lu( k, k ) ) );
+        T           pivot_abs = math_type::abs( lu( k, k ) );
         for ( std::size_t i = k + 1; i < n; ++i )
         {
-            const T candidate = static_cast<T>( std::abs( lu( i, k ) ) );
+            const T candidate = math_type::abs( lu( i, k ) );
             if ( candidate > pivot_abs )
             {
                 pivot     = i;
@@ -255,7 +260,7 @@ small_solve_info<T> factor_lu(
             info.status        = small_solve_status::singular;
             info.rank          = k;
             info.determinant   = T{};
-            info.min_abs_pivot = std::isfinite( info.min_abs_pivot ) ? info.min_abs_pivot : T{};
+            info.min_abs_pivot = math_type::is_finite( info.min_abs_pivot ) ? info.min_abs_pivot : T{};
             info.pivot_ratio   = info.min_abs_pivot / scale;
             return info;
         }

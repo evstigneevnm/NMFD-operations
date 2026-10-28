@@ -1,4 +1,6 @@
 #include <cstdlib>
+#include <array>
+#include <memory>
 #include <algorithm>
 #include <iomanip>
 #include <iostream>
@@ -10,6 +12,10 @@
 #include <nmfd/operations/cpu_vector_operations_var_prec.h>
 #include <scfd/backend/serial_cpu.h>
 #include <nmfd/operations/dense_operations_base.h>
+#include <nmfd/operations/static_vector_space.h>
+#include <nmfd/operations/pair_vector_space.h>
+#include <nmfd/operations/linalg/small_dense.h>
+#include <nmfd/operations/linalg/host_small_dense_backend.h>
 
 namespace
 {
@@ -281,12 +287,62 @@ void run_dense_tests( test_report &report )
     );
 }
 
+void run_augmented_tests( test_report &report )
+{
+    using space_type               = cpu_vector_operations_var_prec<100>;
+    using T                        = typename space_type::scalar_type;
+    using math_type                = nmfd::operations::backend::math<void, T>;
+    using scalar_space             = nmfd::operations::static_vector_space<T, 1>;
+    using pair_space               = nmfd::operations::pair_vector_space<space_type, scalar_space>;
+    auto                    first  = std::make_shared<space_type>( 1 );
+    auto                    second = std::make_shared<scalar_space>();
+    pair_space              space( first, second );
+    pair_space::vector_type state;
+    space.init_vector( state );
+    space.start_use_vector( state );
+    const T tiny( "1e-35" ), tolerance( "1e-60" );
+    state.first[0]  = 3;
+    state.second[0] = 4;
+    report.require( space.norm( state ) == T( 5 ), "multiprecision product norm" );
+    first->add_lin_comb( tiny, state.first, state.first );
+    report.require( state.first[0] == T( 3 ) + 3 * tiny, "three-argument add_lin_comb preserves precision" );
+    state.second[0] = std::numeric_limits<T>::infinity();
+    report.require( !space.is_valid_number( state ), "product validity rejects a nonfinite scalar" );
+    space.stop_use_vector( state );
+    space.free_vector( state );
+
+    nmfd::operations::linalg::small_matrix<T, 2, 2> lu( 2, 2 );
+    lu( 0, 0 ) = 1;
+    lu( 0, 1 ) = 1;
+    lu( 1, 0 ) = 1;
+    lu( 1, 1 ) = T( 1 ) + tiny;
+    std::array<std::size_t, 2> pivots;
+    auto                       info = nmfd::operations::linalg::factor_lu( lu, pivots );
+    report.require(
+        info.status == nmfd::operations::linalg::small_solve_status::success, "sub-double Schur pivot is not singular"
+    );
+    using dense_type = nmfd::operations::linalg::host_small_dense_backend<std::ptrdiff_t, T>;
+    dense_type dense;
+    T          cosine, sine;
+    dense.generate_plane_rotation( T( 3 ), T( 4 ), cosine, sine );
+    report.require(
+        math_type::abs( cosine - T( 3 ) / 5 ) < tolerance && math_type::abs( sine - T( 4 ) / 5 ) < tolerance,
+        "real multiprecision plane rotation"
+    );
+    T x = 3, y = 4;
+    dense.apply_plane_rotation( x, y, cosine, sine );
+    report.require(
+        math_type::abs( x - 5 ) < tolerance && math_type::abs( y ) < tolerance, "plane rotation application"
+    );
+}
+
 } // namespace
 
 int main()
 {
     test_report report;
     run_var_prec_tests( report );
+    run_augmented_tests( report );
     run_dense_tests<typename cpu_vector_operations_var_prec<100>::scalar_type>( report );
     run_dense_tests<
         boost::multiprecision::number<boost::multiprecision::cpp_bin_float<100>, boost::multiprecision::et_on>>(

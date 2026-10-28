@@ -10,6 +10,7 @@
 #include <type_traits>
 #include <utility>
 #include <vector>
+#include <nmfd/operations/backend/math.h>
 
 namespace nmfd
 {
@@ -380,7 +381,7 @@ public:
     {
         const scalar_type original_first = first;
         first                            = cosine * first + sine * second;
-        if constexpr ( std::is_floating_point<scalar_type>::value )
+        if constexpr ( std::is_same_v<scalar_type, real_type> )
         {
             second = -sine * original_first + cosine * second;
         }
@@ -395,7 +396,7 @@ public:
         const scalar_type &first, const scalar_type &second, scalar_type &cosine, scalar_type &sine
     ) const
     {
-        if constexpr ( std::is_floating_point<scalar_type>::value )
+        if constexpr ( std::is_same_v<scalar_type, real_type> )
         {
             if ( second == scalar_type{} )
             {
@@ -404,7 +405,7 @@ public:
                 return;
             }
 
-            const scalar_type radius = std::hypot( first, second );
+            const scalar_type radius = backend::math<void, scalar_type>::hypot( first, second );
             cosine                   = first / radius;
             sine                     = second / radius;
         }
@@ -471,8 +472,8 @@ private:
 
     static bool finite( const scalar_type &value )
     {
-        if constexpr ( std::is_floating_point<scalar_type>::value )
-            return std::isfinite( value );
+        if constexpr ( std::is_same_v<scalar_type, real_type> )
+            return backend::math<void, scalar_type>::is_finite( value );
         else
             return std::isfinite( value.real() ) && std::isfinite( value.imag() );
     }
