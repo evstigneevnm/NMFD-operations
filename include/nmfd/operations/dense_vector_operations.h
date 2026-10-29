@@ -79,23 +79,23 @@ class dense_vector_operations
                   Backend, typename VectorTraits::scalar_type>::real_type>>
 {
 public:
-    using backend_type          = Backend;
-    using scalar_type           = typename VectorTraits::scalar_type;
-    using ordinal_type          = Ordinal;
-    using big_ordinal_type      = Ordinal;
-    using memory_type           = typename backend_type::memory_type;
-    using vector_type           = typename VectorTraits::vector_type;
-    using multivector_type      = std::vector<vector_type>;
-    using scalar_traits         = nmfd::operations::detail::scfd_backend_ext::scalar_traits<backend_type, scalar_type>;
-    using norm_type             = typename scalar_traits::real_type;
-    using Tsc                   = norm_type;
-    using real_traits_type      = typename VectorTraits::template rebind<norm_type>;
-    using vector_type_real      = typename real_traits_type::vector_type;
-    using host_view_traits      = nmfd::operations::detail::scfd_backend_ext::host_view_traits<vector_type>;
-    using host_view_traits_real = nmfd::operations::detail::scfd_backend_ext::host_view_traits<vector_type_real>;
-    using for_each_type         = typename backend_type::for_each_type;
-    using reduce_type           = typename backend_type::reduce_type;
-    using copy_type             = typename backend_type::copy_type;
+    using backend_type           = Backend;
+    using scalar_type            = typename VectorTraits::scalar_type;
+    using ordinal_type           = Ordinal;
+    using big_ordinal_type       = Ordinal;
+    using memory_type            = typename backend_type::memory_type;
+    using vector_type            = typename VectorTraits::vector_type;
+    using multivector_type       = std::vector<vector_type>;
+    using scalar_traits          = nmfd::operations::detail::scfd_backend_ext::scalar_traits<backend_type, scalar_type>;
+    using norm_type              = typename scalar_traits::real_type;
+    using Tsc                    = norm_type;
+    using abs_vector_traits_type = typename VectorTraits::template rebind<norm_type>;
+    using vector_of_abs_type     = typename abs_vector_traits_type::vector_type;
+    using host_view_traits       = nmfd::operations::detail::scfd_backend_ext::host_view_traits<vector_type>;
+    using abs_host_view_traits_type = nmfd::operations::detail::scfd_backend_ext::host_view_traits<vector_of_abs_type>;
+    using for_each_type             = typename backend_type::for_each_type;
+    using reduce_type               = typename backend_type::reduce_type;
+    using copy_type                 = typename backend_type::copy_type;
     using high_precision_reduction_type =
         nmfd::operations::blas1::high_precision::compensated_reduction<backend_type, scalar_type, ordinal_type>;
     using operations_base_type =
@@ -640,10 +640,10 @@ public:
         for_each_inst_.wait();
     }
 
-    void make_abs_copy( const vector_type &x, vector_type_real &y ) const
+    void make_abs_copy( const vector_type &x, vector_of_abs_type &y ) const
     {
         const auto xp = vt_.get_raw_ptr( x );
-        auto       yp = real_traits_.get_raw_ptr( y );
+        auto       yp = abs_vector_traits_.get_raw_ptr( y );
         for_each_inst_(
             [=] __DEVICE_TAG__( ordinal_type i ) { yp[i] = scalar_traits::asum_term( xp[i] ); },
             static_cast<ordinal_type>( get_size( x ) )
@@ -651,60 +651,60 @@ public:
         for_each_inst_.wait();
     }
 
-    void make_abs( vector_type_real &x ) const
+    void make_abs( vector_of_abs_type &x ) const
     {
-        auto xp = real_traits_.get_raw_ptr( x );
+        auto xp = abs_vector_traits_.get_raw_ptr( x );
         for_each_inst_(
             [=] __DEVICE_TAG__( ordinal_type i ) { xp[i] = xp[i] < norm_type( 0 ) ? -xp[i] : xp[i]; },
-            static_cast<ordinal_type>( real_traits_.get_loc_size( x ) )
+            static_cast<ordinal_type>( abs_vector_traits_.get_loc_size( x ) )
         );
         for_each_inst_.wait();
     }
 
-    void max_pointwise( const norm_type sc, const vector_type_real &x, vector_type_real &y ) const
+    void max_pointwise( const norm_type sc, const vector_of_abs_type &x, vector_of_abs_type &y ) const
     {
-        const auto xp = real_traits_.get_raw_ptr( x );
-        auto       yp = real_traits_.get_raw_ptr( y );
+        const auto xp = abs_vector_traits_.get_raw_ptr( x );
+        auto       yp = abs_vector_traits_.get_raw_ptr( y );
         for_each_inst_(
             [=] __DEVICE_TAG__( ordinal_type i ) {
                 const norm_type xy = xp[i] > yp[i] ? xp[i] : yp[i];
                 yp[i]              = xy > sc ? xy : sc;
             },
-            static_cast<ordinal_type>( real_traits_.get_loc_size( x ) )
+            static_cast<ordinal_type>( abs_vector_traits_.get_loc_size( x ) )
         );
         for_each_inst_.wait();
     }
 
-    void max_pointwise( const norm_type sc, vector_type_real &y ) const
+    void max_pointwise( const norm_type sc, vector_of_abs_type &y ) const
     {
-        auto yp = real_traits_.get_raw_ptr( y );
+        auto yp = abs_vector_traits_.get_raw_ptr( y );
         for_each_inst_(
             [=] __DEVICE_TAG__( ordinal_type i ) { yp[i] = yp[i] > sc ? yp[i] : sc; },
-            static_cast<ordinal_type>( real_traits_.get_loc_size( y ) )
+            static_cast<ordinal_type>( abs_vector_traits_.get_loc_size( y ) )
         );
         for_each_inst_.wait();
     }
 
-    void min_pointwise( const norm_type sc, const vector_type_real &x, vector_type_real &y ) const
+    void min_pointwise( const norm_type sc, const vector_of_abs_type &x, vector_of_abs_type &y ) const
     {
-        const auto xp = real_traits_.get_raw_ptr( x );
-        auto       yp = real_traits_.get_raw_ptr( y );
+        const auto xp = abs_vector_traits_.get_raw_ptr( x );
+        auto       yp = abs_vector_traits_.get_raw_ptr( y );
         for_each_inst_(
             [=] __DEVICE_TAG__( ordinal_type i ) {
                 const norm_type xy = xp[i] < yp[i] ? xp[i] : yp[i];
                 yp[i]              = xy < sc ? xy : sc;
             },
-            static_cast<ordinal_type>( real_traits_.get_loc_size( x ) )
+            static_cast<ordinal_type>( abs_vector_traits_.get_loc_size( x ) )
         );
         for_each_inst_.wait();
     }
 
-    void min_pointwise( const norm_type sc, vector_type_real &y ) const
+    void min_pointwise( const norm_type sc, vector_of_abs_type &y ) const
     {
-        auto yp = real_traits_.get_raw_ptr( y );
+        auto yp = abs_vector_traits_.get_raw_ptr( y );
         for_each_inst_(
             [=] __DEVICE_TAG__( ordinal_type i ) { yp[i] = yp[i] < sc ? yp[i] : sc; },
-            static_cast<ordinal_type>( real_traits_.get_loc_size( y ) )
+            static_cast<ordinal_type>( abs_vector_traits_.get_loc_size( y ) )
         );
         for_each_inst_.wait();
     }
@@ -716,23 +716,25 @@ public:
         set_value_at_point( value, index, x );
     }
 
-    norm_type max_element( vector_type_real &x ) const
+    norm_type max_element( vector_of_abs_type &x ) const
     {
         return reduce_inst_(
-            static_cast<ordinal_type>( real_traits_.get_loc_size( x ) ), real_traits_.get_raw_ptr( x ),
+            static_cast<ordinal_type>( abs_vector_traits_.get_loc_size( x ) ), abs_vector_traits_.get_raw_ptr( x ),
             -std::numeric_limits<norm_type>::infinity(), nmfd::operations::detail::scfd_backend_ext::max_op<norm_type>()
         );
     }
 
-    std::size_t argmax_element( vector_type_real &x ) const
+    std::size_t argmax_element( vector_of_abs_type &x ) const
     {
         return max_argmax_element( x ).second;
     }
 
-    std::pair<norm_type, std::size_t> max_argmax_element( vector_type_real &x ) const
+    std::pair<norm_type, std::size_t> max_argmax_element( vector_of_abs_type &x ) const
     {
         return nmfd::operations::detail::scfd_backend_ext::arg_reduce<backend_type, norm_type, ordinal_type>::
-            max_argmax( static_cast<ordinal_type>( real_traits_.get_loc_size( x ) ), real_traits_.get_raw_ptr( x ) );
+            max_argmax(
+                static_cast<ordinal_type>( abs_vector_traits_.get_loc_size( x ) ), abs_vector_traits_.get_raw_ptr( x )
+            );
     }
 
     void assign_slices(
@@ -908,7 +910,7 @@ protected:
     mutable scfd::arrays::array<scalar_type, memory_type> helper_;
 
 private:
-    real_traits_type                                    real_traits_;
+    abs_vector_traits_type                              abs_vector_traits_;
     mutable scfd::arrays::array<norm_type, memory_type> helper_real_;
     mutable high_precision_reduction_type               high_precision_reduction_;
     mutable std::size_t                                 high_precision_size_           = 0;

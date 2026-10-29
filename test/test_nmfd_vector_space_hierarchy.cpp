@@ -65,7 +65,13 @@ void test_hierarchy()
     using project_space_type = nmfd::operations::scfd_vector_space<Backend, T>;
     using vector_type        = typename space_type::vector_type;
     using norm_type          = typename space_type::norm_type;
+    using abs_traits_type    = typename traits_type::template rebind<norm_type>;
+    using abs_vector_type    = typename abs_traits_type::vector_type;
 
+    static_assert( std::is_same_v<typename operations_type::abs_vector_traits_type, abs_traits_type> );
+    static_assert( std::is_same_v<typename operations_type::vector_of_abs_type, abs_vector_type> );
+    static_assert( std::is_same_v<typename space_type::vector_of_abs_type, abs_vector_type> );
+    static_assert( std::is_same_v<typename project_space_type::vector_of_abs_type, abs_vector_type> );
     static_assert( !has_factory<operations_type>::value, "Operations must not require a space factory" );
     static_assert( has_factory<space_type>::value, "A space must provide its factory" );
     static_assert( std::is_base_of_v<typename space_type::parent_t, space_type> );
@@ -230,8 +236,9 @@ void test_static_traits()
     using backend_type = scfd::backend::serial_cpu<std::ptrdiff_t>;
     using traits_type  = nmfd::operations::detail::static_vector_traits<T, 3>;
     using space_type   = nmfd::operations::dense_vector_space<traits_type, backend_type>;
-    space_type                       space;
-    typename space_type::vector_type x{}, y{};
+    space_type                              space;
+    typename space_type::vector_type        x{};
+    typename space_type::vector_of_abs_type y{};
     space.assign_scalar( T( 2 ), x );
     space.assign_scalar( T( 3 ), y );
     require( space.size() == 3 && space.scalar_prod( x, y ) == T( 18 ), "Static storage uses the same operations" );
