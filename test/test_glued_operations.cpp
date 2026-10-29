@@ -119,15 +119,15 @@ void test_vectors()
         require( space.size() == 5 && space.get_size( *x ) == 5, "Unequal component dimensions" );
         const T expected_dot = T( 5 ) * traits_type::conj_mul( a, b );
         require(
-            traits_type::norm_sq_term( operations.scalar_prod( *x, *y ) - expected_dot ) <= tolerance,
+            traits_type::abs_sq( operations.scalar_prod( *x, *y ) - expected_dot ) <= tolerance,
             "Conjugating glued scalar product"
         );
         require(
-            std::abs( space.norm_sq( *x ) - norm_type( 5 ) * traits_type::norm_sq_term( a ) ) <= tolerance,
+            std::abs( space.norm_sq( *x ) - norm_type( 5 ) * traits_type::abs_sq( a ) ) <= tolerance,
             "Glued unscaled norm"
         );
         require(
-            std::abs( space.norm2_sq( *x ) - norm_type( 2 ) * traits_type::norm_sq_term( a ) ) <= tolerance,
+            std::abs( space.norm2_sq( *x ) - norm_type( 2 ) * traits_type::abs_sq( a ) ) <= tolerance,
             "Historical component-normalized metric"
         );
         require(
@@ -136,8 +136,7 @@ void test_vectors()
         );
         operations.assign_lin_comb( T( 2 ), *x, T( -1 ), *y, *z );
         require(
-            traits_type::norm_sq_term( first->get_value_at_point( 0, ( *z ).comp( 0 ) ) - ( T( 2 ) * a - b ) ) <=
-                tolerance,
+            traits_type::abs_sq( first->get_value_at_point( 0, ( *z ).comp( 0 ) ) - ( T( 2 ) * a - b ) ) <= tolerance,
             "Glued affine mapping"
         );
         typename space_type::multivector_type basis;
@@ -145,7 +144,7 @@ void test_vectors()
         space.start_use_multivector( basis, 2 );
         space.assign( *x, basis, 2, 1 );
         require(
-            traits_type::norm_sq_term( space.scalar_prod( basis, 2, 1, *y ) - expected_dot ) <= tolerance,
+            traits_type::abs_sq( space.scalar_prod( basis, 2, 1, *y ) - expected_dot ) <= tolerance,
             "Glued multivector algebra"
         );
         space.stop_use_multivector( basis, 2 );
@@ -301,8 +300,8 @@ void test_matrices()
                     expected += reference[i][j][row + column * rows[i]] * host_x[j][column];
             const T actual = image->space_comp( i ).get_value_at_point( row, ( *y ).comp( i ) );
             require(
-                std::sqrt( traits_type::norm_sq_term( actual - expected ) ) <=
-                    tolerance * std::max( norm_type( 1 ), std::sqrt( traits_type::norm_sq_term( expected ) ) ),
+                std::sqrt( traits_type::abs_sq( actual - expected ) ) <=
+                    tolerance * std::max( norm_type( 1 ), std::sqrt( traits_type::abs_sq( expected ) ) ),
                 "Glued block multiplication matches assembled reference"
             );
         }
@@ -346,7 +345,7 @@ void test_matrices()
     );
     require(
         std::sqrt(
-            traits_type::norm_sq_term(
+            traits_type::abs_sq(
                 image->space_comp( 0 ).get_value_at_point( 0, ( *y ).comp( 0 ) ) - original - host_x[0][0]
             )
         ) <= tolerance,

@@ -27,12 +27,14 @@ allocation and dimensions. `scfd_vector_space` preserves activation-time allocat
 and normalized norms. The global `scfd_vector_operations` alias is retained for
 existing callers. Instances own mutable scratch and are not concurrently reusable.
 
-Missing SCFD scalar/complex traits, indexed reductions, deterministic random fill,
-and scoped host-view write-back live in internal helpers. Native SCFD scalar traits
-supply basic real math. Compensated GPU reductions require the kernel object built
+Scalar semantics come from `scfd::utils::scalar_traits<T>`, including `abs_type`,
+modulus `abs()`, squared modulus `abs_sq()`, BLAS `asum_term()`, conjugated
+products, and finiteness checks. Backend math and complex helpers forward to these
+traits; indexed reductions, deterministic random fill, and scoped host views remain
+operations facilities. Compensated GPU reductions require the kernel object built
 by the Makefile; ordinary header-only consumers do not need it on CPU.
 
-Applications use `nmfd/operations/backend/complex.h`, `math.h`, and `host_view.h`
+Applications use `nmfd/operations/backend/complex.h`, `math.h`, `random.h`, and `host_view.h`
 with the `nmfd::operations::backend` namespace. These public headers expose the
 same helper types without introducing runtime adapters or duplicate formulas;
 do not include the internal backend-extension headers from application code.
@@ -52,8 +54,8 @@ another copy. These methods refactorize on every call; they do not cache factors
 `make test-dense` checks serial/OMP float and double solves; `test-dense-cuda`
 checks device QR, repeated solves, singular/nonfinite failures, and rollback.
 
-Optional `backend/boost_multiprecision.h` specializes the existing scalar math
-interface for host Boost numbers; the variable-precision vector-space header
+Optional `backend/boost_multiprecision.h` includes SCFD's
+`boost_multiprecision_scalar_traits.h`; the variable-precision vector-space header
 includes it automatically. Native backend headers do not require Boost.
 Host `solve_in_place` also accepts borrowed views over `std::vector<T>` storage
 for these scalars, without allocating SCFD arrays of nontrivial objects.
@@ -61,6 +63,12 @@ for these scalars, without allocating SCFD arrays of nontrivial objects.
 expression templates enabled and disabled, plus scalar finiteness and exponent
 range. Elimination coefficients are materialized before their source entries
 are overwritten, so lazy scalar expressions cannot change a computed factor.
+
+For complex entries, `make_abs_copy()` writes true moduli to `vector_of_abs_type`.
+BLAS `asum()` instead sums `abs(real) + abs(imag)`. The historical `norm1()`
+and `norm_inf()` component-sum conventions are unchanged. `test-backend` checks
+these distinctions on real/complex serial, OpenMP, and CUDA vectors, including
+compensated sums and conjugated dot products.
 
 `glued_vector`, `glued_vector_operations`, and `glued_vector_space` form homogeneous
 fixed-count block products. Component dimensions may differ. Algebra and factories

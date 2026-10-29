@@ -103,7 +103,7 @@ struct arithmetic
         return two_prod( x, y, err );
     }
 
-    static real_type norm_sq_term( const scalar_type &x, real_type &err )
+    static real_type abs_sq( const scalar_type &x, real_type &err )
     {
         return two_prod( x, x, err );
     }
@@ -150,7 +150,7 @@ struct arithmetic<std::complex<T>>
         return scalar_type( real_sum, imag_sum );
     }
 
-    static real_type norm_sq_term( const scalar_type &x, real_type &err )
+    static real_type abs_sq( const scalar_type &x, real_type &err )
     {
         T       e_real;
         T       e_imag;
@@ -205,7 +205,7 @@ struct arithmetic<thrust::complex<T>>
         return scalar_type( real_sum, imag_sum );
     }
 
-    static real_type norm_sq_term( const scalar_type &x, real_type &err )
+    static real_type abs_sq( const scalar_type &x, real_type &err )
     {
         T       e_real;
         T       e_imag;
@@ -303,7 +303,7 @@ public:
         for ( Ordinal i = 0; i < n; ++i )
         {
             real_type       err;
-            const real_type term = arithmetic_type::norm_sq_term( x[i], err );
+            const real_type term = arithmetic_type::abs_sq( x[i], err );
             acc.add_with_error( term, err );
         }
         return acc.result();
@@ -409,7 +409,7 @@ public:
             for ( Ordinal i = 0; i < n; ++i )
             {
                 real_type       err;
-                const real_type term = arithmetic_type::norm_sq_term( x[i], err );
+                const real_type term = arithmetic_type::abs_sq( x[i], err );
                 local.add_with_error( term, err );
             }
             partials[static_cast<std::size_t>( omp_get_thread_num() )] = local;

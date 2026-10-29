@@ -25,6 +25,7 @@ ifneq ($(strip $(BOOST_ROOT)),)
 CPPFLAGS += -I$(BOOST_ROOT)/include
 endif
 HEADERS := $(shell find include test -name '*.h' -o -name '*.cuh')
+HEADERS += $(wildcard $(SCFD_ROOT)/include/scfd/utils/*scalar_traits.h)
 CPU_TESTS = $(BUILD_DIR)/hierarchy.bin $(BUILD_DIR)/glued.bin $(BUILD_DIR)/algebra_float.bin $(BUILD_DIR)/algebra_double.bin $(BUILD_DIR)/product.bin $(BUILD_DIR)/product_lifetime.bin $(BUILD_DIR)/block_operator.bin $(BUILD_DIR)/two_block_access.bin $(BUILD_DIR)/matrix_market.bin $(BUILD_DIR)/small_dense.bin $(BUILD_DIR)/io.bin $(BUILD_DIR)/backend.bin $(BUILD_DIR)/dense.bin
 CUDA_TESTS = $(BUILD_DIR)/hierarchy_cuda.bin $(BUILD_DIR)/glued_cuda.bin $(BUILD_DIR)/algebra_cuda_float.bin $(BUILD_DIR)/algebra_cuda_double.bin $(BUILD_DIR)/product_cuda.bin $(BUILD_DIR)/backend_cuda.bin $(BUILD_DIR)/dense_cuda.bin
 

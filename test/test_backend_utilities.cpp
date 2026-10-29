@@ -28,6 +28,47 @@ void require( bool passed )
 }
 
 template <class Backend, class T>
+void test_complex_contract()
+{
+    using complex_type   = nmfd::operations::backend::complex_t<Backend, T>;
+    using traits_type    = scfd::utils::scalar_traits<complex_type>;
+    using space_type     = nmfd::operations::scfd_vector_space<Backend, complex_type>;
+    using abs_space_type = nmfd::operations::scfd_vector_space<Backend, T>;
+    static_assert( std::is_same_v<typename space_type::norm_type, typename traits_type::abs_type> );
+    static_assert( std::is_same_v<typename space_type::vector_of_abs_type, typename abs_space_type::vector_type> );
+    space_type                                space( 2 );
+    abs_space_type                            abs_space( 2 );
+    nmfd::detail::vector_wrap<space_type>     x( space ), y( space );
+    nmfd::detail::vector_wrap<abs_space_type> magnitudes( abs_space );
+    x.start_use();
+    y.start_use();
+    magnitudes.start_use();
+    const complex_type values[] = { traits_type::make( T( 3 ), T( 4 ) ), traits_type::make( T( -5 ), T( 12 ) ) };
+    space.set( values, *x );
+    space.make_abs_copy( *x, *magnitudes );
+    require( abs_space.get_value_at_point( 0, *magnitudes ) == T( 5 ) );
+    require( abs_space.get_value_at_point( 1, *magnitudes ) == T( 13 ) );
+    require( space.get_value_at_point( 0, *x ) == values[0] && space.get_value_at_point( 1, *x ) == values[1] );
+    for ( bool high_precision : { false, true } )
+    {
+        if ( high_precision )
+            space.use_high_precision();
+        require( space.asum( *x ) == T( 24 ) );
+        require( space.norm_sq( *x ) == T( 194 ) );
+        const auto dot = space.scalar_prod( *x, *x );
+        require( traits_type::real( dot ) == T( 194 ) && traits_type::imag( dot ) == T( 0 ) );
+        // Preserve the existing component-sum conventions during trait consolidation.
+        require( space.norm1( *x ) == T( 24 ) && space.norm_inf( *x ) == T( 17 ) );
+    }
+    space.assign_scalar( traits_type::make( T( -2 ), T( 1 ) ), *y );
+    const auto dot = space.scalar_prod( *x, *y );
+    require( traits_type::real( dot ) == T( 20 ) && traits_type::imag( dot ) == T( 30 ) );
+    space.assign_scalar( traits_type::zero(), *x );
+    space.make_abs_copy( *x, *magnitudes );
+    require( abs_space.norm( *magnitudes ) == T( 0 ) );
+}
+
+template <class Backend, class T>
 void test()
 {
     using math_type      = nmfd::operations::backend::math<Backend, T>;
@@ -78,6 +119,12 @@ int main()
         test<scfd::backend::serial_cpu<std::ptrdiff_t>, double>();
         test<backend_type, float>();
         test<backend_type, double>();
+#ifndef TEST_BACKEND_CUDA
+        test_complex_contract<scfd::backend::serial_cpu<std::ptrdiff_t>, float>();
+        test_complex_contract<scfd::backend::serial_cpu<std::ptrdiff_t>, double>();
+#endif
+        test_complex_contract<backend_type, float>();
+        test_complex_contract<backend_type, double>();
         std::printf( "Public backend utilities: %u checks, 0 failures\n", checks );
         return 0;
     }

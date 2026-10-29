@@ -76,7 +76,7 @@ class dense_vector_operations
               typename VectorTraits::scalar_type, typename VectorTraits::vector_type,
               std::vector<typename VectorTraits::vector_type>, Ordinal,
               typename nmfd::operations::detail::scfd_backend_ext::scalar_traits<
-                  Backend, typename VectorTraits::scalar_type>::real_type>>
+                  Backend, typename VectorTraits::scalar_type>::abs_type>>
 {
 public:
     using backend_type           = Backend;
@@ -87,7 +87,7 @@ public:
     using vector_type            = typename VectorTraits::vector_type;
     using multivector_type       = std::vector<vector_type>;
     using scalar_traits          = nmfd::operations::detail::scfd_backend_ext::scalar_traits<backend_type, scalar_type>;
-    using norm_type              = typename scalar_traits::real_type;
+    using norm_type              = typename scalar_traits::abs_type;
     using Tsc                    = norm_type;
     using abs_vector_traits_type = typename VectorTraits::template rebind<norm_type>;
     using vector_of_abs_type     = typename abs_vector_traits_type::vector_type;
@@ -303,7 +303,7 @@ public:
         const auto xp                  = vt_.get_raw_ptr( x );
         auto       hp                  = helper_real_.raw_ptr();
         for_each_inst_(
-            [=] __DEVICE_TAG__( ordinal_type i ) { hp[i] = scalar_traits::norm_sq_term( xp[i] ); }, get_loc_size( x )
+            [=] __DEVICE_TAG__( ordinal_type i ) { hp[i] = scalar_traits::abs_sq( xp[i] ); }, get_loc_size( x )
         );
         for_each_inst_.wait();
         return reduce_inst_( get_loc_size( x ), hp, norm_type( 0 ) );
@@ -342,7 +342,7 @@ public:
     norm_type norm_rank1( const vector_type &x, const scalar_type val_x ) const
     {
         return nmfd::operations::detail::scfd_backend_ext::math<backend_type, norm_type>::sqrt(
-            norm_sq( x ) + scalar_traits::norm_sq_term( val_x )
+            norm_sq( x ) + scalar_traits::abs_sq( val_x )
         );
     }
 
@@ -645,7 +645,7 @@ public:
         const auto xp = vt_.get_raw_ptr( x );
         auto       yp = abs_vector_traits_.get_raw_ptr( y );
         for_each_inst_(
-            [=] __DEVICE_TAG__( ordinal_type i ) { yp[i] = scalar_traits::asum_term( xp[i] ); },
+            [=] __DEVICE_TAG__( ordinal_type i ) { yp[i] = scalar_traits::abs( xp[i] ); },
             static_cast<ordinal_type>( get_size( x ) )
         );
         for_each_inst_.wait();

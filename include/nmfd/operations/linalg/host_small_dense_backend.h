@@ -19,18 +19,6 @@ namespace operations
 namespace linalg
 {
 
-template <class T, class = void>
-struct host_small_dense_real_type
-{
-    using type = T;
-};
-
-template <class T>
-struct host_small_dense_real_type<T, std::void_t<decltype( std::declval<const T &>().real() )>>
-{
-    using type = std::decay_t<decltype( std::declval<const T &>().real() )>;
-};
-
 template <class T>
 class host_dense_vector
 {
@@ -452,7 +440,7 @@ public:
     }
 
 private:
-    using real_type = typename host_small_dense_real_type<scalar_type>::type;
+    using real_type = typename scfd::utils::scalar_traits<scalar_type>::abs_type;
 
     static std::size_t as_size( ordinal_type value )
     {
@@ -466,16 +454,12 @@ private:
 
     static real_type magnitude( const scalar_type &value )
     {
-        using std::abs;
-        return abs( value );
+        return scfd::utils::scalar_traits<scalar_type>::abs( value );
     }
 
     static bool finite( const scalar_type &value )
     {
-        if constexpr ( std::is_same_v<scalar_type, real_type> )
-            return backend::math<void, scalar_type>::is_finite( value );
-        else
-            return std::isfinite( value.real() ) && std::isfinite( value.imag() );
+        return scfd::utils::scalar_traits<scalar_type>::is_finite( value );
     }
 
     static bool is_valid( const vector_type &vector )
