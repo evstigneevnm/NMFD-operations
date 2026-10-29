@@ -75,7 +75,7 @@ $(BUILD_DIR)/backend.bin: test/test_backend_utilities.cpp $(HEADERS) | $(BUILD_D
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(EXTRA_FLAGS) $(OPENMP_FLAGS) $< -o $@
 
 test-backend: $(BUILD_DIR)/backend.bin
-	OMP_NUM_THREADS=$(OMP_NUM_THREADS) ./$(BUILD_DIR)/backend.bin
+	OMP_NUM_THREADS=$(OMP_NUM_THREADS) $<
 
 $(BUILD_DIR)/glued.bin: test/test_glued_operations.cpp $(HEADERS) | $(BUILD_DIR)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(EXTRA_FLAGS) $(OPENMP_FLAGS) $< -o $@
